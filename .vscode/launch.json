@@ -5,7 +5,7 @@
       "name": "C/C++ Runner: Debug Session",
       "type": "lldb",
       "request": "launch",
-      "args": ["commands.sh"],
+      "args": ["myscript.sh"],
       "cwd": "/Users/jasoncruzsipiran/Documents/GitHub/MyShell/P3",
       "program": "/Users/jasoncruzsipiran/Documents/GitHub/MyShell/P3/mysh"
     }
