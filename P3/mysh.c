@@ -8,7 +8,6 @@
 #include <sys/stat.h>
 
 #define BUFSIZE 4096
-#define WORDSIZE 16
 
 /* welcome message for interactive mode */
 void printWelcome() { printf("Welcome to my shell!\n"); }
@@ -66,8 +65,22 @@ int main(int argc, char *argv[]) {
     int lineIndex = 0;
     int capacity = BUFSIZE;
 
-    while((bytes = read(STDIN_FILENO, buffer, BUFSIZE)) > 0)
+    while(1)
     {
+        if(interactive)
+        {
+            printf("mysh> ");
+            fflush(stdout);
+        }
+
+        bytes = read(STDIN_FILENO, buffer, BUFSIZE);
+
+        if(bytes == 0) 
+        {
+            if(interactive) printf("\n");
+            break;
+        }
+
         for(int i = 0; i < bytes; i++)
         {
             if(buffer[i] == '\n')
