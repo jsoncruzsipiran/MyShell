@@ -1,6 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define BUFSIZE 4096
 #define WORDSIZE 16
@@ -66,6 +71,16 @@ int readFromStdIn(){  // taken from PA2, but can be replaced later on
     return 0;
 }
 
+void printWelcome()
+{
+    printf("Welcome to my shell!\n");
+}
+
+void printGoodbye()
+{
+    printf("Exiting my shell.\n");
+}
+
 int main(int argc, char *argv[]) {
     
     if (argc > 2){
@@ -73,18 +88,33 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Invalid number of arguments: %d. There should be at most 2 arguments.\n", argc); // can change later
         return 1;
 
-    } else if (argc == 1){ // read from stdin
+    } 
 
-        printf("Welcome to my shell!\n");
-        fflush(stdout); // this makes sure welcome message is printed before input is requested
+    if(argc == 2)
+    {
+        char *batchCommands = argv[1];
 
-        if (readFromStdIn()){ // if 1, readFromStdIn failed
-            return 1;
+        int fd = open(batchCommands, O_RDONLY);
+        
+        if(fd < 0)
+        {
+            fprintf(stderr, "Error: could not open file %s\n", batchCommands);
+            return EXIT_FAILURE;
         }
 
-    } else { // read from specific file
-        // insert batch mode tingz
+        dup2(fd, STDIN_FILENO);
+
+        close(fd);
     }
 
-    return 0;
+    int interactive = isatty(STDIN_FILENO);
+
+    if(interactive)
+    {
+        printWelcome();
+        fflush(stdout);
+    }
+
+    
+    return EXIT_SUCCESS;
 }
