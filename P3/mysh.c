@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 
 #define BUFSIZE 4096
+#define MAX_ARGS 10
 
 /* welcome message for interactive mode */
 void printWelcome() { printf("Welcome to my shell!\n"); }
@@ -99,14 +100,72 @@ int runCD(char *commandLine){
     return 1;
 }
 
+int runNonBuiltInCommands(const char *command, char **argv)
+{
+    char *directories[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL};
+    char path[BUFSIZE];
+
+    pid_t pid = fork();
+
+    if(pid == 0)
+    {
+        for(int i = 0; directories[i] != NULL; i++)
+        {
+            snprintf(path, sizeof(path), "%s/%s", directories[i], command);
+            if(access(path, X_OK) == 0)
+            {
+                return execv(path, argv);
+            }
+        }
+    } else if(pid > 0)
+    {
+        int status;
+        waitpid(pid, &status, 0);
+        return WEXITSTATUS(status);
+    } else {
+        perror("fork");
+        return EXIT_FAILURE;
+    }
+}
+
+int parseCommandLine(char *commandLine, char *argv[], int maxArgs)
+{
+    int argc = 0;
+    char *token;
+
+    token = strtok(commandLine, " \t\n");
+
+    while (token != NULL && argc < maxArgs - 1) 
+    {
+        argv[argc++] = token;
+        token = strtok(NULL, " \t\n");
+    }
+
+    argv[argc] = NULL;
+    return argc;
+}
+
 int runCommand(char *commandLine){ // separated actual commands to make more modular
+    if(commandLine[0] == '#') return 0;
+
+    char line[BUFSIZE];
+    strcpy(line, commandLine);
+
+    char *argv[MAX_ARGS];
+    int argc = parseCommandLine(line, argv, MAX_ARGS);
+
     int status = 0;
 
+    printf("%s\n", commandLine); // for now, just echo the command line
+
     // doesn't deal with pipes or redirection
-    if (strcmp(commandLine, "cd") == 0 || strncmp(commandLine, "cd ", 3) == 0){
+    if (strcmp(argv[0], "cd") == 0)
+    {
         status = runCD(commandLine);
-    } else if (strcmp(commandLine, "pwd") == 0){
+    } else if (strcmp(argv[0], "pwd") == 0){
         status = runPWD();
+    } else {
+        status = runNonBuiltInCommands(argv[0], argv);
     }
 
     //add more commands here later
@@ -185,7 +244,6 @@ int main(int argc, char *argv[])
                 {
                     commandLine[lineIndex] = '\0';
 
-                    printf("%s\n", commandLine); // for now, just echo the command line
                     int runCommandStatus = runCommand(commandLine); // 0 if successful, 1 if failure [deal with failure/pipe/redirection logic later]
 
                     lineIndex = 0;
@@ -215,7 +273,7 @@ int main(int argc, char *argv[])
     if (lineIndex > 0)
     {
         commandLine[lineIndex] = '\0';
-        printf("%s\n", commandLine);
+        int runCommandStatus = runCommand(commandLine); // 0 if successful, 1 if failure [deal with failure/pipe/redirection logic later]
     }
 
     free(commandLine);
