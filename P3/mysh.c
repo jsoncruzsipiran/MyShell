@@ -16,6 +16,7 @@ void printWelcome() { printf("Welcome to my shell!\n"); }
 /* goodbye message for interactive mode */
 void printGoodbye() { printf("Exiting my shell.\n"); }
 
+/* function to open a batch file provided */
 int runBatchFile(char *batchFile){
     int fd = open(batchFile, O_RDONLY); // file descriptor for batch file
 
@@ -31,6 +32,25 @@ int runBatchFile(char *batchFile){
     close(fd); // free link between the batchFile and its original fd
 
     return 0; 
+}
+
+/* function to parse command line into array of arguments */
+int parseCommandLine(char *commandLine, char *argv[], int maxArgs)
+{
+    int argc = 0; // number of arguments
+    char *token;
+
+    token = strtok(commandLine, " \t\n"); // create a token by parsing the commandLine based on its encounter with the first specified delimiter
+
+    /* parse the rest of the command line and store it in the argv array */
+    while (token != NULL && argc < maxArgs - 1) 
+    {
+        argv[argc++] = token;
+        token = strtok(NULL, " \t\n");
+    }
+
+    argv[argc] = NULL; // terminating value for excv()
+    return argc; // return number of arguments
 }
 
 int numArgs(char *commandLine){
@@ -137,25 +157,6 @@ int runNonBuiltInCommands(const char *command, char **argv)
         perror("fork");
         return EXIT_FAILURE; // FAILED
     }
-}
-
-/* function to parse command line into array of arguments */
-int parseCommandLine(char *commandLine, char *argv[], int maxArgs)
-{
-    int argc = 0; // number of arguments
-    char *token;
-
-    token = strtok(commandLine, " \t\n"); // create a token by parsing the commandLine based on its encounter with the first specified delimiter
-
-    /* parse the rest of the command line and store it in the argv array */
-    while (token != NULL && argc < maxArgs - 1) 
-    {
-        argv[argc++] = token;
-        token = strtok(NULL, " \t\n");
-    }
-
-    argv[argc] = NULL; // terminating value for excv()
-    return argc; // return number of arguments
 }
 
 int runCommand(char *commandLine){ // separated actual commands to make more modular
