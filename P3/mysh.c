@@ -102,6 +102,7 @@ int runCD(char *commandLine){
 int runCommand(char *commandLine){ // separated actual commands to make more modular
     int status = 0;
 
+    // doesn't deal with pipes or redirection
     if (strcmp(commandLine, "cd") == 0 || strncmp(commandLine, "cd ", 3) == 0){
         status = runCD(commandLine);
     } else if (strcmp(commandLine, "pwd") == 0){
@@ -185,7 +186,7 @@ int main(int argc, char *argv[])
                     commandLine[lineIndex] = '\0';
 
                     printf("%s\n", commandLine); // for now, just echo the command line
-                    int runCommandStatus = runCommand(commandLine); // 0 if successful, 1 if failure
+                    int runCommandStatus = runCommand(commandLine); // 0 if successful, 1 if failure [deal with failure/pipe/redirection logic later]
 
                     lineIndex = 0;
                 }
