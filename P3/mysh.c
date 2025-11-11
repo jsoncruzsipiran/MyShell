@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 
 #define BUFSIZE 4096
-#define MAX_ARGS 10
+#define MAX_ARGS 100
 
 /* welcome message for interactive mode */
 void printWelcome() { printf("Welcome to my shell!\n"); }
@@ -100,71 +100,85 @@ int runCD(char *commandLine){
     return 1;
 }
 
+/* function to run commands not directly built-in to the mysh program */
 int runNonBuiltInCommands(const char *command, char **argv)
 {
-    char *directories[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL};
+    char *directories[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL}; // the only directories we will be searching for
     char path[BUFSIZE];
 
     pid_t pid = fork();
 
-    if(pid == 0)
+    /* create new process to be executed while the original process gathers its info */
+    if(pid == 0) // child process
     {
+        /* traverse through different possible paths for the command */
         for(int i = 0; directories[i] != NULL; i++)
         {
-            snprintf(path, sizeof(path), "%s/%s", directories[i], command);
+            snprintf(path, sizeof(path), "%s/%s", directories[i], command); // builds new path
+            
+            /* finds if path for command exists and is executable */
             if(access(path, X_OK) == 0)
             {
                 return execv(path, argv);
+
+                /* only reaches this point if execv() fails */
+                perror("execv"); 
+                exit(EXIT_FAILURE); // returns to the parent process that this child process has FAILED
             }
         }
-    } else if(pid > 0)
+    } else if(pid > 0) // parent process
     {
+        /* wait until child process terminates and gather its exit code */
         int status;
         waitpid(pid, &status, 0);
-        return WEXITSTATUS(status);
-    } else {
+
+        return WEXITSTATUS(status); // returns child status
+    } else { // fork could not be created
         perror("fork");
-        return EXIT_FAILURE;
+        return EXIT_FAILURE; // FAILED
     }
 }
 
+/* function to parse command line into array of arguments */
 int parseCommandLine(char *commandLine, char *argv[], int maxArgs)
 {
-    int argc = 0;
+    int argc = 0; // number of arguments
     char *token;
 
-    token = strtok(commandLine, " \t\n");
+    token = strtok(commandLine, " \t\n"); // create a token by parsing the commandLine based on its encounter with the first specified delimiter
 
+    /* parse the rest of the command line and store it in the argv array */
     while (token != NULL && argc < maxArgs - 1) 
     {
         argv[argc++] = token;
         token = strtok(NULL, " \t\n");
     }
 
-    argv[argc] = NULL;
-    return argc;
+    argv[argc] = NULL; // terminating value for excv()
+    return argc; // return number of arguments
 }
 
 int runCommand(char *commandLine){ // separated actual commands to make more modular
     if(commandLine[0] == '#') return 0;
 
-    char line[BUFSIZE];
+    char line[BUFSIZE]; // copy of commandLine string
     strcpy(line, commandLine);
 
-    char *argv[MAX_ARGS];
-    int argc = parseCommandLine(line, argv, MAX_ARGS);
+    char *argv[MAX_ARGS]; // array of arguments from commandLine
+    int argc = parseCommandLine(line, argv, MAX_ARGS); // number of arguments
 
     int status = 0;
 
-    printf("%s\n", commandLine); // for now, just echo the command line
+    //printf("%s\n", commandLine); // for now, just echo the command line
 
-    // doesn't deal with pipes or redirection
-    if (strcmp(argv[0], "cd") == 0)
+    /* change status based on execution of the command */
+    if (strcmp(argv[0], "cd") == 0) // built-in cd command
     {
         status = runCD(commandLine);
-    } else if (strcmp(argv[0], "pwd") == 0){
+    } else if (strcmp(argv[0], "pwd") == 0) // built-in pwd command
+    {
         status = runPWD();
-    } else {
+    } else { // non-built-in commands
         status = runNonBuiltInCommands(argv[0], argv);
     }
 
