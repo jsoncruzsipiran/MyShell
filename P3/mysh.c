@@ -55,16 +55,6 @@ int parseCommandLine(char *commandLine, char *argv[], int maxArgs)
     return argc; // return number of arguments
 }
 
-int numArgs(char *commandLine){
-    int count = 0;
-    char *token = strtok(commandLine, " \t\n");
-    while (token != NULL) {
-        count++;
-        token = strtok(NULL, " \t\n");
-    }
-    return count;
-}
-
 int runPWD(){
     char cwd[BUFSIZE]; // maybe change this later or add realloc logic to deal with long paths?
 
@@ -78,31 +68,23 @@ int runPWD(){
     return 0;
 }
 
-int runCD(char *commandLine){
-    if (strncmp(commandLine, "cd ", 3) == 0) { // allows for "cd <some path>" or "cd " (this goes to home dir)
+int runCD(int argc, char *argv[]){
 
-        if (numArgs(commandLine) > 2){
-            fprintf(stderr, "Error: Too many arguments.\n");
-            return EXIT_FAILURE;
-        }
+    if (argc > 2){ // error handler for too many arguments
+        fprintf(stderr, "Error: Too many arguments.\n");
+        return EXIT_FAILURE;
+    }
 
-        // printf("before changed path: '%s'\n", commandLine);
-        char *path = commandLine + 3;
-        // printf("after changed path: '%s'\n", path);
+    if (argc > 1) { // deals with "cd <path>" case
 
-        if (*path == '\0') { // deals with edge case of "cd" with no arguments
-            char *home = getenv("HOME");
-            if (!home) { fprintf(stderr, "Error: HOME not set\n"); return EXIT_FAILURE; }
-            path = home;
-        }
-
-        if (chdir(path) != 0) { 
-            fprintf(stderr, "Error: Could not change directory to %s\n", path); 
+        if (chdir(argv[1]) != 0) { 
+            fprintf(stderr, "Error: Could not change directory to %s\n", argv[1]); 
             return EXIT_FAILURE; 
         }
 
         return 0;
-    } else if (strcmp(commandLine, "cd") == 0) { // allows for "cd" -> goes to home directory
+
+    } else if (argc == 1) { // allows for "cd" -> goes to home directory
 
         char *home = getenv("HOME");
         if (home == NULL) {
@@ -264,12 +246,10 @@ int runCommand(char *commandLine){ // separated actual commands to make more mod
 
     int status = 0;
 
-    //printf("%s\n", commandLine); // for now, just echo the command line
-
     /* change status based on execution of the command */
     if (strcmp(argv[0], "cd") == 0) // built-in cd command
     {
-        status = runCD(commandLine);
+        status = runCD(argc, argv);
     } else if (strcmp(argv[0], "pwd") == 0) // built-in pwd command
     {
         status = runPWD();
