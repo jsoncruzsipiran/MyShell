@@ -212,6 +212,16 @@ int runNonBuiltInCommands(const char *command, char **argv)
     /* create new process to be executed while the original process gathers its info */
     if(pid == 0) // child process
     {
+        /* check if program is passable as it stands */
+        if(access(command, X_OK) == 0)
+        {
+            execv(command, argv);
+
+            /* only reaches this point if execv() fails */
+            perror("execv"); 
+            exit(EXIT_FAILURE); // returns to the parent process that this child process has FAILED
+        }
+
         /* traverse through different possible paths for the command */
         for(int i = 0; directories[i] != NULL; i++)
         {
@@ -220,13 +230,15 @@ int runNonBuiltInCommands(const char *command, char **argv)
             /* finds if path for command exists and is executable */
             if(access(path, X_OK) == 0)
             {
-                return execv(path, argv);
+                execv(path, argv);
 
                 /* only reaches this point if execv() fails */
                 perror("execv"); 
                 exit(EXIT_FAILURE); // returns to the parent process that this child process has FAILED
             }
         }
+
+        exit(EXIT_FAILURE);
     } else if(pid > 0) // parent process
     {
         /* wait until child process terminates and gather its exit code */
