@@ -10,6 +10,8 @@
 #define BUFSIZE 4096
 #define MAX_ARGS 100
 
+static int interactive;
+
 /* welcome message for interactive mode */
 void printWelcome() { printf("Welcome to my shell!\n"); }
 
@@ -130,6 +132,9 @@ int runWhich(char *filename)
     /* create new process to be executed while the original process gathers its info */
     if(pid == 0) // child process
     {
+        /* terminate program if we are given a built-in command as argument */
+        if((strcmp(filename, "cd") == 0) || (strcmp(filename, "pwd") == 0) || (strcmp(filename, "which") == 0) || (strcmp(filename, "exit") == 0) || (strcmp(filename, "die") == 0)) exit(EXIT_FAILURE);
+
         /* check if program is passable as it stands */
         if(access(filename, X_OK) == 0)
         {
@@ -168,12 +173,32 @@ int runWhich(char *filename)
 
 int runExit()
 {
-    return 0;
+    if (interactive)
+    {
+        printGoodbye();
+        fflush(stdout);
+    }
+
+    exit(EXIT_SUCCESS);
 }
 
-int runDie()
+int runDie(const int argc, char **argv)
 {
-    return 0;
+    for(int i = 1; i < argc; i++)
+    {
+        printf("%s ", argv[i]);
+    }
+    printf("\n");
+
+    fflush(stdout);
+
+    if (interactive)
+    {
+        printGoodbye();
+        fflush(stdout);
+    }
+
+    exit(EXIT_FAILURE);
 }
 
 /* function to run commands not directly built-in to the mysh program */
@@ -209,10 +234,11 @@ int runNonBuiltInCommands(const char *command, char **argv)
         waitpid(pid, &status, 0);
 
         return WEXITSTATUS(status); // returns child status
-    } else { // fork could not be created
-        perror("fork");
-        return EXIT_FAILURE; // FAILED
-    }
+    } 
+
+    // fork could not be created
+    perror("fork");
+    return EXIT_FAILURE; // FAILED
 }
 
 int runCommand(char *commandLine){ // separated actual commands to make more modular
@@ -246,7 +272,7 @@ int runCommand(char *commandLine){ // separated actual commands to make more mod
     } else if(strcmp(argv[0], "exit") == 0){ // built-in exit command
         status = runExit();
     } else if(strcmp(argv[0], "die") == 0){ // built-in die command 
-        status = runDie();
+        status = runDie(argc, argv);
     } else { // non-built-in commands
         status = runNonBuiltInCommands(argv[0], argv);
     }
@@ -256,7 +282,6 @@ int runCommand(char *commandLine){ // separated actual commands to make more mod
 
 int main(int argc, char *argv[])
 {
-
     /* checks for arguments over the necessary amount, must be 1 or none */
     if (argc > 2)
     {
@@ -276,7 +301,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    int interactive = isatty(STDIN_FILENO); // interactive flag using isatty() method
+    interactive = isatty(STDIN_FILENO); // interactive flag using isatty() method
 
     /* print welcome message if we are interactive mode */
     if (interactive)
