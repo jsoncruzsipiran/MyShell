@@ -120,6 +120,62 @@ int runCD(char *commandLine){
     return 1;
 }
 
+int runWhich(char *filename)
+{
+    char *directories[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL}; // the only directories we will be searching for
+    char path[BUFSIZE];
+
+    pid_t pid = fork();
+
+    /* create new process to be executed while the original process gathers its info */
+    if(pid == 0) // child process
+    {
+        /* check if program is passable as it stands */
+        if(access(filename, X_OK) == 0)
+        {
+            printf("%s\n", filename);
+            fflush(stdout);
+
+            exit(EXIT_SUCCESS);
+        }
+
+        /* another check if program is a bare name and passable by appending specified directories */
+        for(int i = 0; directories[i] != NULL; i++)
+        {
+            snprintf(path, sizeof(path), "%s/%s", directories[i], filename); // builds new path
+
+            if(access(path, X_OK) == 0)
+            {
+                printf("%s\n", path);
+                fflush(stdout);
+
+                exit(EXIT_SUCCESS);
+            }
+        }
+
+        exit(EXIT_FAILURE);
+    } else if(pid > 0) { // parent process
+        /* wait until child process terminates and gather its exit code */
+        int status;
+        waitpid(pid, &status, 0);
+
+        return WEXITSTATUS(status); 
+    } else { // fork could not be created 
+        perror("fork");
+        return EXIT_FAILURE; // FAILED
+    }
+}
+
+int runExit()
+{
+    return 0;
+}
+
+int runDie()
+{
+    return 0;
+}
+
 /* function to run commands not directly built-in to the mysh program */
 int runNonBuiltInCommands(const char *command, char **argv)
 {
@@ -160,7 +216,7 @@ int runNonBuiltInCommands(const char *command, char **argv)
 }
 
 int runCommand(char *commandLine){ // separated actual commands to make more modular
-    if(commandLine[0] == '#') return 0;
+    if(commandLine[0] == '#') return EXIT_SUCCESS;
 
     char line[BUFSIZE]; // copy of commandLine string
     strcpy(line, commandLine);
@@ -179,13 +235,22 @@ int runCommand(char *commandLine){ // separated actual commands to make more mod
     } else if (strcmp(argv[0], "pwd") == 0) // built-in pwd command
     {
         status = runPWD();
+    } else if(strcmp(argv[0], "which") == 0){ // built-in which command
+        if(argc != 2)
+        {
+            status = 1;
+            return status;
+        }
+
+        status = runWhich(argv[1]);
+    } else if(strcmp(argv[0], "exit") == 0){ // built-in exit command
+        status = runExit();
+    } else if(strcmp(argv[0], "die") == 0){ // built-in die command 
+        status = runDie();
     } else { // non-built-in commands
         status = runNonBuiltInCommands(argv[0], argv);
     }
 
-    //add more commands here later
-
-    // printf("Finished running command: '%s' with status %d\n", commandLine, status); // temp
     return status; // 0 if successful, 1 if command failed 
 }
 
