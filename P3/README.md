@@ -15,4 +15,5 @@ netID: fag46
 
 
 Tingz to Think About:
-- if doing command c in interactive mode, does it still send out goodbye message (it does if we do the Ctrl + D command, indicating EOF and allowing for the rest of the code to run through)
+1. caps/vs uncapitalized commands [have not checked that yet]
+    a. in real terminal, PWD === pwd (idk if we want to implement both because getcwd does not let PWD through), CD != cd (only cd works, which matches our implementation)

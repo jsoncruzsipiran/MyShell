@@ -21,7 +21,7 @@ int runBatchFile(char *batchFile){
     /* print error if batch file did not successfully open */
     if (fd < 0)
     {
-        fprintf(stderr, "Error: could not open file %s\n", batchFile);
+        fprintf(stderr, "Error: Could not open file %s\n", batchFile);
         return EXIT_FAILURE;
     }
 
@@ -32,13 +32,95 @@ int runBatchFile(char *batchFile){
     return 0; 
 }
 
+int numArgs(char *commandLine){
+    int count = 0;
+    char *token = strtok(commandLine, " \t\n");
+    while (token != NULL) {
+        count++;
+        token = strtok(NULL, " \t\n");
+    }
+    return count;
+}
+
+int runPWD(){
+    char cwd[BUFSIZE]; // maybe change this later or add realloc logic to deal with long paths?
+
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("Current working directory: %s\n", cwd);
+    } else {
+        perror("Error getting current working directory");
+        return 1;
+    }
+
+    return 0;
+}
+
+int runCD(char *commandLine){
+    if (strncmp(commandLine, "cd ", 3) == 0) { // allows for "cd <some path>" or "cd " (this goes to home dir)
+
+        if (numArgs(commandLine) > 2){
+            fprintf(stderr, "Error: Too many arguments.\n");
+            return EXIT_FAILURE;
+        }
+
+        // printf("before changed path: '%s'\n", commandLine);
+        char *path = commandLine + 3;
+        // printf("after changed path: '%s'\n", path);
+
+        if (*path == '\0') { // deals with edge case of "cd" with no arguments
+            char *home = getenv("HOME");
+            if (!home) { fprintf(stderr, "Error: HOME not set\n"); return EXIT_FAILURE; }
+            path = home;
+        }
+
+        if (chdir(path) != 0) { 
+            fprintf(stderr, "Error: Could not change directory to %s\n", path); 
+            return EXIT_FAILURE; 
+        }
+
+        return 0;
+    } else if (strcmp(commandLine, "cd") == 0) { // allows for "cd" -> goes to home directory
+
+        char *home = getenv("HOME");
+        if (home == NULL) {
+            fprintf(stderr, "Error: HOME environment variable not set.\n");
+            return EXIT_FAILURE;
+        }
+
+        int status = chdir(home);
+        if (status != 0) {
+            fprintf(stderr, "Error: Could not change directory to %s\n", home);
+            return EXIT_FAILURE;
+        }
+
+        return 0;
+    }
+
+    return 1;
+}
+
+int runCommand(char *commandLine){ // separated actual commands to make more modular
+    int status = 0;
+
+    if (strcmp(commandLine, "cd") == 0 || strncmp(commandLine, "cd ", 3) == 0){
+        status = runCD(commandLine);
+    } else if (strcmp(commandLine, "pwd") == 0){
+        status = runPWD();
+    }
+
+    //add more commands here later
+
+    // printf("Finished running command: '%s' with status %d\n", commandLine, status); // temp
+    return status; // 0 if successful, 1 if command failed 
+}
+
 int main(int argc, char *argv[])
 {
 
     /* checks for arguments over the necessary amount, must be 1 or none */
     if (argc > 2)
     {
-        fprintf(stderr, "Invalid number of arguments: %d. There should be at most 2 arguments.\n", argc); // can change later
+        fprintf(stderr, "Error: There should be at most 2 arguments.\n");
         return EXIT_FAILURE;
     }
 
@@ -69,7 +151,7 @@ int main(int argc, char *argv[])
     char *commandLine = malloc(BUFSIZE);
     if (!commandLine)
     {
-        fprintf(stderr, "Memory allocation failed.\n");
+        fprintf(stderr, "Error: Memory allocation failed.\n");
         return EXIT_FAILURE;
     }
 
@@ -102,7 +184,8 @@ int main(int argc, char *argv[])
                 {
                     commandLine[lineIndex] = '\0';
 
-                    printf("%s\n", commandLine);
+                    printf("%s\n", commandLine); // for now, just echo the command line
+                    int runCommandStatus = runCommand(commandLine); // 0 if successful, 1 if failure
 
                     lineIndex = 0;
                 }
@@ -114,7 +197,7 @@ int main(int argc, char *argv[])
                     char *temp = realloc(commandLine, capacity);
                     if (!temp)
                     {
-                        fprintf(stderr, "Memory reallocation failed.\n");
+                        fprintf(stderr, "Error: Memory reallocation failed.\n");
                         free(commandLine);
 
                         return EXIT_FAILURE;
