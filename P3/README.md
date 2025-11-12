@@ -4,6 +4,17 @@ netID: jc3003
 name: Fiona Yzabelle Gumaroy
 netID: fag46
 
+## Program Design:
+## Pipelines
+When dealing with pipelines, we have an array data structure, char *parsedPipes[][], such that parsedPipes[i] is one command. 
+
+For ex: if commandLine = "echo hello | cat"
+
+parsedPipes[0][0] = echo, parsedPipes[0][1] = hello
+parsedPipes[1][0] = cat
+
+We then use this array to differentiate between the different commands, and to implement the piping logic.
+
 ## Test Programs:
 ### 1 Overview 
 1a. Requirement: Program correctly detects whether to run in interactive mode or batch mode.
