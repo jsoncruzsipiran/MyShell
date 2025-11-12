@@ -17,3 +17,5 @@ netID: fag46
 Tingz to Think About:
 1. caps/vs uncapitalized commands [have not checked that yet]
     a. in real terminal, PWD === pwd (idk if we want to implement both because getcwd does not let PWD through), CD != cd (only cd works, which matches our implementation)
+2. when doing "./mysh /" seems like it leads to infinite loop
+3. when doing "./mysh |" it prints out "pipe>" like how we do interactive mode? idk if that was intentional or just a bug
