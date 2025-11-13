@@ -98,15 +98,17 @@ int parsePipeline(char *commandLine, char *parsedPipes[][MAX_ARGS])
 
 int runPWD(int argc)
 {
+    if (argc > 1)
+    {
+        fprintf(stderr, "pwd: Too many arguments.\n");
+        return 1;
+    }
+
     char cwd[BUFSIZE]; // maybe change this later or add realloc logic to deal with long paths?
 
     if (getcwd(cwd, sizeof(cwd)) != NULL)
     {
         fprintf(stdout, "Current working directory: %s\n", cwd);
-    }
-    else if (argc > 1)
-    {
-        fprintf(stderr, "pwd: Too many arguments.\n");
     }
     else
     {
