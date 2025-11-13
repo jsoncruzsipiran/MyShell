@@ -96,17 +96,21 @@ int parsePipeline(char *commandLine, char *parsedPipes[][MAX_ARGS])
     return pipes;
 }
 
-int runPWD()
+int runPWD(int argc)
 {
     char cwd[BUFSIZE]; // maybe change this later or add realloc logic to deal with long paths?
 
     if (getcwd(cwd, sizeof(cwd)) != NULL)
     {
-        printf("Current working directory: %s\n", cwd);
+        fprintf(stdout, "Current working directory: %s\n", cwd);
+    }
+    else if (argc > 1)
+    {
+        fprintf(stderr, "pwd: Too many arguments.\n");
     }
     else
     {
-        perror("Error getting current working directory");
+        fprintf(stderr, "pwd: Error getting current working directory.\n");
         return 1;
     }
 
@@ -118,7 +122,7 @@ int runCD(int argc, char *argv[])
 
     if (argc > 2)
     { // error handler for too many arguments
-        fprintf(stderr, "Error: Too many arguments.\n");
+        fprintf(stderr, "cd: Too many arguments.\n");
         return EXIT_FAILURE;
     }
 
@@ -127,7 +131,7 @@ int runCD(int argc, char *argv[])
 
         if (chdir(argv[1]) != 0)
         {
-            fprintf(stderr, "Error: Could not change directory to %s\n", argv[1]);
+            fprintf(stderr, "cd: Could not change directory to %s\n", argv[1]);
             return EXIT_FAILURE;
         }
 
@@ -139,14 +143,14 @@ int runCD(int argc, char *argv[])
         char *home = getenv("HOME");
         if (home == NULL)
         {
-            fprintf(stderr, "Error: HOME environment variable not set.\n");
+            fprintf(stderr, "cd: HOME environment variable not set.\n");
             return EXIT_FAILURE;
         }
 
         int status = chdir(home);
         if (status != 0)
         {
-            fprintf(stderr, "Error: Could not change directory to %s\n", home);
+            fprintf(stderr, "cd: Could not change directory to %s\n", home);
             return EXIT_FAILURE;
         }
 
@@ -312,7 +316,7 @@ int runCommand(char *commandLine)
     }
     else if (strcmp(argv[0], "pwd") == 0) // built-in pwd command
     {
-        status = runPWD();
+        status = runPWD(argc);
     }
     else if (strcmp(argv[0], "which") == 0)
     { // built-in which command
@@ -354,7 +358,7 @@ int runCommandWithArgv(char **argv)
     }
     else if (strcmp(argv[0], "pwd") == 0)
     {
-        status = runPWD();
+        status = runPWD(argc);
     }
     else if (strcmp(argv[0], "which") == 0)
     {
