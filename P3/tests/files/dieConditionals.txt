@@ -1,0 +1,2 @@
+cat badfile
+or die exiting

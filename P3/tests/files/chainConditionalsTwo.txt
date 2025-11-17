@@ -1,0 +1,3 @@
+echo hello
+and cat badfile
+or echo runs because cat failed

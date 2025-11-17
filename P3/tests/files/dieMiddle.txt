@@ -1,0 +1,3 @@
+cat badfile
+or die die
+echo hello

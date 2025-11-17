@@ -1,0 +1,2 @@
+cat badfile
+or echo previous failed, so I run

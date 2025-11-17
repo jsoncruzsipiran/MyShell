@@ -6,14 +6,17 @@
 #include <sys/wait.h>
 
 int main(){
-    int totalTests = 32;
+    int totalTests = 43;
     int passedTests = 0;
     int failedTests = 0;
 
     char *testExecutables[] = {
-        "./builds/overview", //3
+        "./builds/overview", //5
+        "./builds/commandFormat", //21
+        "./builds/builtInCommands" // 17
     };
-    int numTests[] = {3};
+
+    int numTests[] = {5, 21, 17};
 
     int numSuites = sizeof(testExecutables) / sizeof(testExecutables[0]);
     
@@ -48,7 +51,7 @@ int main(){
     }
     
     printf("\n========================================\n");
-    printf("Tests Summary:\n");
+    printf("Total Tests Summary:\n");
     printf("  Passed: %d/%d\n", passedTests, totalTests);
     printf("========================================\n");
     

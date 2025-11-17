@@ -26,9 +26,9 @@ runTest: all
 	@echo "\nRunning $(TEST) ... \n"
 	@./$(BUILD_FOLDER)/$(TEST)
 
-# # run all tests
-# runAllTests: all
-# 	@./$(BUILD_FOLDER)/runTests
+# run all tests
+runAllTests: all
+	@./$(BUILD_FOLDER)/runTests
 
 # remove mysh.o and all built test outputs
 clean:

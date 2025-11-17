@@ -1,0 +1,3 @@
+echo hello
+and echo step 1
+and echo step 2

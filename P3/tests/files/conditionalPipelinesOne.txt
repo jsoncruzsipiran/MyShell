@@ -1,0 +1,2 @@
+echo hello | cat badfile
+and echo pipeline failed

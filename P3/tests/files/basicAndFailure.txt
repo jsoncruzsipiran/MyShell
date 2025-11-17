@@ -1,0 +1,2 @@
+cat badfile
+and echo won't run
