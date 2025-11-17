@@ -57,7 +57,7 @@ int runPWD(int argc)
 
     if (getcwd(cwd, sizeof(cwd)) != NULL)
     {
-        fprintf(stdout, "Current working directory: %s\n", cwd);
+        fprintf(stdout, "%s\n", cwd);
     }
     else
     {
@@ -652,9 +652,8 @@ int handlePipeline(commandPacket *packets, int numCmds)
     return 0;
 }
 
-int main(int argc, char *argv[])
-{
-    /* checks for arguments over the necessary amount, must be 1 or none */
+int initializeShell(int argc, char *argv[]){
+/* checks for arguments over the necessary amount, must be 1 or none */
     if (argc > 2)
     {
         fprintf(stderr, "Error: There should be at most 2 arguments.\n");
@@ -682,7 +681,10 @@ int main(int argc, char *argv[])
         printWelcome();
         fflush(stdout);
     }
+    return EXIT_SUCCESS;
+}
 
+int runShell(){
     /* read from STDIN (may be terminal, may be batchFile) */
     char *commandLine = malloc(BUFSIZE);
     if (!commandLine)
@@ -790,12 +792,24 @@ int main(int argc, char *argv[])
     }
 
     if (lineIndex > 0)
-    { // is this actually being used? if so, might need to deal with pipelines differently here too!
+    { 
         commandLine[lineIndex] = '\0';
         stripComments(commandLine);
 
         if (commandLine[0] != '\0') runCommand(commandLine);
     }
+    free(commandLine);
+
+    return EXIT_SUCCESS;
+}
+
+int main(int argc, char *argv[])
+{
+    if (initializeShell(argc, argv) != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
+    }
+    
+    int result = runShell();
 
     if (interactive)
     {
@@ -803,6 +817,5 @@ int main(int argc, char *argv[])
         fflush(stdout);
     }
 
-    free(commandLine);
     return EXIT_SUCCESS;
 }
