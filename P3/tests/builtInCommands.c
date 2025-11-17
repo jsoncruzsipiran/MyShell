@@ -697,13 +697,13 @@ int dieSuccess()
 
         if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
         {
-            printf("Exit Code: %d\n", WEXITSTATUS(status));
+            printf("\nExit Code: %d\n", WEXITSTATUS(status));
             printf("\nTest succeeded: Program correctly processed 'die' command.\n");
             return 0;
         }
         else
         {
-            printf("Exit Code: %d\n", WEXITSTATUS(status));
+            printf("\nExit Code: %d\n", WEXITSTATUS(status));
             printf("\nTest failed: Program incorrectly processed 'die' command (child exit code %d).\n",
                    WIFEXITED(status) ? WEXITSTATUS(status) : -1);
             return 1;
@@ -748,13 +748,13 @@ int dieArgs()
 
         if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
         {
-            printf("Exit Code: %d\n", WEXITSTATUS(status));
+            printf("\nExit Code: %d\n", WEXITSTATUS(status));
             printf("\nTest succeeded: Program correctly processed 'die' command when given arguments.\n");
             return 0;
         }
         else
         {
-            printf("Exit Code: %d\n", WEXITSTATUS(status));
+            printf("\nExit Code: %d\n", WEXITSTATUS(status));
             printf("\nTest failed: Program incorrectly processed 'die' command (child exit code %d).\n",
                    WIFEXITED(status) ? WEXITSTATUS(status) : -1);
             return 1;
@@ -800,13 +800,13 @@ int dieConditionals()
 
         if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
         {
-            printf("Exit Code: %d\n", WEXITSTATUS(status));
+            printf("\nExit Code: %d\n", WEXITSTATUS(status));
             printf("\nTest succeeded: Program correctly processed 'die' command when given conditionals.\n");
             return 0;
         }
         else
         {
-            printf("Exit Code: %d\n", WEXITSTATUS(status));
+            printf("\nExit Code: %d\n", WEXITSTATUS(status));
             printf("\nTest failed: Program incorrectly processed 'die' command (child exit code %d).\n",
                    WIFEXITED(status) ? WEXITSTATUS(status) : -1);
             return 1;
@@ -851,13 +851,13 @@ int diePipelines()
 
         if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
         {
-            printf("Exit Code: %d\n", WEXITSTATUS(status));
+            printf("\nExit Code: %d\n", WEXITSTATUS(status));
             printf("\nTest succeeded: Program correctly processed 'die' command when piped.\n");
             return 0;
         }
         else
         {
-            printf("Exit Code: %d\n", WEXITSTATUS(status));
+            printf("\nExit Code: %d\n", WEXITSTATUS(status));
             printf("\nTest failed: Program incorrectly processed 'die' command (child exit code %d).\n",
                    WIFEXITED(status) ? WEXITSTATUS(status) : -1);
             return 1;

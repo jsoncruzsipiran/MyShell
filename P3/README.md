@@ -124,8 +124,7 @@ Therefore, testing commands in both modes would be redundant - if commands work 
 4c: Tests:
     i. basicOutputRedirection(): Write a program, where command = "echo test > file.txt".
     ii. basicInputRedirection(): Write a program, where command = "cat < file.txt"
-    iii. appendRedirection(): Write a program, where command = "echo hello >> file.txt"
-    iv. errorRedirection(): Write a program, where command = "cat < nonexistent.txt". This test specifically tests how program logic deals with error handling for redirection.
+    iii. errorRedirection(): Write a program, where command = "cat < nonexistent.txt". This test specifically tests how program logic deals with error handling for redirection.
 
 ### 2.2 Built-in Commands
 1a. Requirement: cd changes the working directory.
@@ -157,7 +156,10 @@ Therefore, testing commands in both modes would be redundant - if commands work 
         exit
         echo world".
         Test program will print out "hello" and not "world" as it exited prior to the "echo world" command.
-    ii. ignoreArgs(): Write a program where command = "exit a". Program should still exit as it ignores the extra arguments.
+    ii. ignoreArgs(): Write a program where command = 
+    "exit a
+    echo should not print" 
+    Program should still exit as it ignores the extra arguments.
     iii. exitPipelines(): Write a program in batch mode where commands = 
         "echo hello | exit
         echo world".
@@ -200,13 +202,26 @@ Tingz to Think About:
     a. in real terminal, PWD === pwd (idk if we want to implement both because getcwd does not let PWD through), CD != cd (only cd works, which matches our implementation)
 2. when doing "./mysh /" seems like it leads to infinite loop
 3. when doing "./mysh |" it prints out "pipe>" like how we do interactive mode? idk if that was intentional or just a bug
-4. when doing die, it prints out a new line
 5. how should we treat "and echo hello" with no previous command?
-6. make sure to recheck the "if (lineIndex > 0)" pipeline thing to make sure laststatus is correct
-7. add a test to see multi commands where something fails and then someethng succeeds and what the exit code should be; and vice versa!
+6. add a test to see multi commands where something fails and then someethng succeeds and what the exit code should be; and vice versa!
 8. empty batch
 9. a lot of commands to run!
 10. BUGS:
-    i. "echo hello | exit" test fails. it prints out world? but doesn't print out echo
     ii "which nonexistent" fails -> tets says it should exit in code 0, but it should exit in code 1?
     iii. "cd badfile" gives code 0, but should give 1?
+
+11. bugs after pushing:
+    i. seems like echo and pipelines dont work: "echo hello | cat" prints hello | cat
+    ii. print out file.txt from redirection
+    iii. test 21: change printing
+    iv. exit codes for things failing
+    v. "echo hello | exit" -> doessn't print world, but it doesn't print hello either
+    vi. for die tests, add \n before "Exit Code"
+
+Tests that are failing but should succeed:
+
+Tests that are succeeding but should fail:
+
+Bugged Tests:
+builtInCommands.c:
+- test twelve

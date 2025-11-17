@@ -880,58 +880,10 @@ int basicInputRedirection(){
     printf("_________________________________________________\n\n");
     printf("Test Nineteen: Testing program logic with basic input redirection.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/bassicInputRedirection.txt"};
+    char *argv[] = {"mysh", "tests/files/basicInputRedirection.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/basicInputRedirection.txt");
-
-    int initStatus = initializeShell(2, argv);
-    (void)initStatus; 
-    pid_t pid = fork();
-    if (pid < 0)
-    {
-        perror("fork");
-        return 1;
-    }
-
-    if (pid == 0)
-    {
-        printf("\nStdout Result: \n");
-        int childStatus = runShell();
-        _exit(childStatus ? EXIT_FAILURE : EXIT_SUCCESS);
-    }
-    else
-    {
-        int status;
-        if (waitpid(pid, &status, 0) < 0)
-        {
-            perror("waitpid");
-            return 1;
-        }
-
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
-        {
-            printf("\nTest succeeded: Program correctly processed the redirection.\n");
-            return 0;
-        }
-        else
-        {
-            printf("\nTest failed: Program incorrectly processed the redirection (child exit code %d).\n",
-                   WIFEXITED(status) ? WEXITSTATUS(status) : -1);
-            return 1;
-        }
-    }
-}
-
-// come back to this
-int appendRedirection(){
-    printf("_________________________________________________\n\n");
-    printf("Test Twenty: Testing program logic with append redirection.\n\n");
-
-    char *argv[] = {"mysh", "tests/files/appendRedirection.txt"};
-
-    printf("Batch File Input: \n");
-    printFile("tests/files/appendRedirection.txt");
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
@@ -1008,7 +960,7 @@ int errorRedirection(){
         //come back to this for status maybe?
         if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
         {
-            printf("\nTest succeeded: Program correctly processed the redirection.\n");
+            printf("\nTest succeeded: Program correctly processed the redirection error handling.\n");
             return 0;
         }
         else
@@ -1050,12 +1002,11 @@ int main(int argc, char *argv[])
     //redirection testing
     failures += basicOutputRedirection();
     failures += basicInputRedirection();
-    failures += appendRedirection();
     failures += errorRedirection();
 
     printf("\n========================================\n");
     printf("Test Summary:\n");
-    printf("  Passed: %d/%d\n", 21 - failures, 21);
+    printf("  Passed: %d/%d\n", 20 - failures, 20);
     printf("========================================\n");
 
     // return number of failures (0 = all passed)

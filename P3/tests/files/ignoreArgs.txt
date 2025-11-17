@@ -1,1 +1,2 @@
 exit a
+echo should not print
