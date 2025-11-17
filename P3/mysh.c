@@ -14,6 +14,12 @@
 
 static int interactive;
 
+typedef struct {
+    char** commandArgument;
+    char* inputFile;
+    char* outputFile;
+} commandPacket; 
+
 /* welcome message for interactive mode */
 void printWelcome() { printf("Welcome to my shell!\n"); }
 
@@ -37,63 +43,6 @@ int runBatchFile(char *batchFile)
     close(fd); // free link between the batchFile and its original fd
 
     return 0;
-}
-
-/* function to parse command line into array of arguments */
-int parseCommandLine(char *commandLine, char *argv[], int maxArgs)
-{
-    int argc = 0; // number of arguments
-    char *token;
-
-    token = strtok(commandLine, " \t\n"); // create a token by parsing the commandLine based on its encounter with the first specified delimiter
-
-    /* parse the rest of the command line and store it in the argv array */
-    while (token != NULL && argc < maxArgs - 1)
-    {
-        argv[argc++] = token;
-        token = strtok(NULL, " \t\n");
-    }
-
-    argv[argc] = NULL; // terminating value for execv()
-    return argc; // return number of arguments
-}
-
-char *trimWhitespace(char *string)
-{
-    if (string == NULL)
-        return NULL;
-    while (isspace((unsigned char)*string))
-        string++;
-    char *end = string + strlen(string) - 1;
-    while (end > string && isspace((unsigned char)*end))
-        end--;
-    *(end + 1) = '\0';
-    return string;
-}
-
-int parsePipeline(char *commandLine, char *parsedPipes[][MAX_ARGS])
-{
-    int pipes = 0;
-    char *firstCommand = NULL;
-    char *pair = strtok_r(commandLine, "|", &firstCommand);
-
-    while (pair != NULL && pipes < MAX_PIPES)
-    {
-        char *trimmed = trimWhitespace(pair);
-        int arg = 0;
-        char *secondCommand = NULL;
-        char *tok = strtok_r(trimmed, " \t\n", &secondCommand);
-        while (tok != NULL && arg < MAX_ARGS - 1)
-        {
-            parsedPipes[pipes][arg++] = tok;
-            tok = strtok_r(NULL, " \t\n", &secondCommand);
-        }
-        parsedPipes[pipes][arg] = NULL; /* terminate argv for this segment */
-        pipes++;
-        pair = strtok_r(NULL, "|", &firstCommand);
-    }
-
-    return pipes;
 }
 
 int runPWD(int argc)
@@ -246,212 +195,461 @@ int runDie(const int argc, char **argv)
     exit(EXIT_FAILURE);
 }
 
-/* function to run commands not directly built-in to the mysh program */
-int runNonBuiltInCommands(const char *command, char **argv)
+char *trimWhitespace(char *string)
 {
-    char *directories[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL}; // the only directories we will be searching for
+    if (string == NULL)
+        return NULL;
+    while (isspace((unsigned char)*string))
+        string++;
+    char *end = string + strlen(string) - 1;
+    while (end > string && isspace((unsigned char)*end))
+        end--;
+    *(end + 1) = '\0';
+    return string;
+}
+
+void stripComments(char *line)
+{
+    char *hash = strchr(line, '#');
+    if (hash)
+        *hash = '\0';
+}
+
+int countArgs(char **argv)
+{
+    int n = 0;
+    while (argv[n] != NULL) n++;
+
+    return n;
+}
+
+void applyInputRedirection(commandPacket *packet, int isPipeline, int isFirstSegment)
+{
+    if (!interactive && packet->inputFile == NULL && (!isPipeline || isFirstSegment))
+    {
+        int devnull = open("/dev/null", O_RDONLY);
+        if (devnull < 0)
+        {
+            perror("open /dev/null");
+            exit(EXIT_FAILURE);
+        }
+        dup2(devnull, STDIN_FILENO);
+        close(devnull);
+    }
+
+    if (packet->inputFile != NULL)
+    {
+        int fd = open(packet->inputFile, O_RDONLY);
+        if (fd < 0)
+        {
+            perror("open input");
+            exit(EXIT_FAILURE);
+        }
+
+        dup2(fd, STDIN_FILENO);
+        close(fd);
+    }
+}
+
+void applyOutputRedirection(commandPacket *packet)
+{
+    if (packet->outputFile != NULL)
+    {
+        int fd = open(packet->outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
+        if (fd < 0)
+        {
+            perror("open output");
+            exit(EXIT_FAILURE);
+        }
+
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+    }
+}
+
+void execExternalFromPath(char *command, char **argv)
+{
+    char *dirs[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL};
     char path[BUFSIZE];
 
-    pid_t pid = fork();
-
-    /* create new process to be executed while the original process gathers its info */
-    if (pid == 0) // child process
+    if (access(command, X_OK) == 0)
     {
-        /* check if program is passable as it stands */
-        if (access(command, X_OK) == 0)
-        {
-            execv(command, argv);
-
-            /* only reaches this point if execv() fails */
-            perror("execv");
-            exit(EXIT_FAILURE); // returns to the parent process that this child process has FAILED
-        }
-
-        /* traverse through different possible paths for the command */
-        for (int i = 0; directories[i] != NULL; i++)
-        {
-            snprintf(path, sizeof(path), "%s/%s", directories[i], command); // builds new path
-
-            /* finds if path for command exists and is executable */
-            if (access(path, X_OK) == 0)
-            {
-                execv(path, argv);
-
-                /* only reaches this point if execv() fails */
-                perror("execv");
-                exit(EXIT_FAILURE); // returns to the parent process that this child process has FAILED
-            }
-        }
-
+        execv(command, argv);
+        perror("execv");
         exit(EXIT_FAILURE);
     }
-    else if (pid > 0) // parent process
-    {
-        /* wait until child process terminates and gather its exit code */
-        int status;
-        waitpid(pid, &status, 0);
 
-        return WEXITSTATUS(status); // returns child status
+    for (int i = 0; dirs[i] != NULL; i++)
+    {
+        snprintf(path, sizeof(path), "%s/%s", dirs[i], command);
+        if (access(path, X_OK) == 0)
+        {
+            execv(path, argv);
+            perror("execv");
+            exit(EXIT_FAILURE);
+        }
     }
 
-    // fork could not be created
-    perror("fork");
-    return EXIT_FAILURE; // FAILED
+    exit(EXIT_FAILURE);
+}
+
+void runBuiltinInPipelineChild(commandPacket *packet)
+{
+    char *cmd = packet->commandArgument[0];
+    int argc = countArgs(packet->commandArgument);
+
+    if (strcmp(cmd, "cd") == 0)
+    {
+        int rc = runCD(argc, packet->commandArgument);
+        exit(rc);
+    }
+
+    if (strcmp(cmd, "pwd") == 0)
+    {
+        int rc = runPWD(argc);
+        exit(rc);
+    }
+
+    if (strcmp(cmd, "which") == 0)
+    {
+        if (argc != 2) exit(EXIT_FAILURE);
+
+        int rc = runWhich(packet->commandArgument[1]);
+        exit(rc);
+    }
+
+    if (strcmp(cmd, "exit") == 0)
+    {
+        exit(EXIT_SUCCESS);
+    }
+
+    if (strcmp(cmd, "die") == 0)
+    {
+        exit(EXIT_FAILURE);
+    }
+
+    exit(EXIT_FAILURE);
+}
+
+void freePacket(commandPacket *packet)
+{
+    for (int i = 0; packet->commandArgument[i] != NULL; i++) free(packet->commandArgument[i]);
+
+    free(packet->commandArgument);
+
+    if (packet->inputFile) free(packet->inputFile);
+
+    if (packet->outputFile) free(packet->outputFile);
+}
+
+/* function to parse command line into array of arguments */
+char** tokenize(char *commandLine, int *numOfTokens)
+{
+    int capacity = 10;
+    int count = 0;
+
+    char **tokens = malloc(sizeof(char *) * capacity);
+    if(!tokens) return NULL;
+
+    char *token = strtok(commandLine, " \t\n");
+
+    while(token != NULL)
+    {
+        if(count == capacity - 1)
+        {
+            capacity *= 2;
+
+            char **temp = realloc(tokens, sizeof(char *) * capacity);
+            if(!temp)
+            {
+                free(tokens);
+                return NULL;
+            }
+            tokens = temp;
+        }
+
+        tokens[count++] = token;
+        token = strtok(NULL, " \t\n");
+    }
+
+    tokens[count] = NULL; // terminating value for execv()
+    *numOfTokens = count;
+
+    return tokens; // return number of arguments
+}
+
+commandPacket buildPacket(char *segment)
+{
+    commandPacket packet;
+    packet.inputFile = NULL;
+    packet.outputFile = NULL;
+    packet.commandArgument = malloc(sizeof(char*) * MAX_ARGS);
+    
+    for (int k = 0; k < MAX_ARGS; k++) packet.commandArgument[k] = NULL;
+
+    int argc = 0;
+    int tokenCount = 0;
+
+    char temp[BUFSIZE];
+    strcpy(temp, segment);
+
+    char **tokens = tokenize(temp, &tokenCount);
+
+    for (int i = 0; i < tokenCount; i++)
+    {
+        if (strcmp(tokens[i], "<") == 0)
+        {
+            if (i + 1 < tokenCount) packet.inputFile = strdup(tokens[i + 1]);
+            i++;
+        }
+        else if (strcmp(tokens[i], ">") == 0)
+        {
+            if (i + 1 < tokenCount) packet.outputFile = strdup(tokens[i + 1]);
+            i++;
+        }
+        else
+        {
+            packet.commandArgument[argc++] = strdup(tokens[i]);
+        }
+    }
+
+    packet.commandArgument[argc] = NULL;
+    free(tokens);
+
+    return packet;
+}
+
+/* function to run commands not directly built-in to the mysh program */
+int runSinglePacket(commandPacket *packet)
+{
+    char *command = packet->commandArgument[0];
+    if(command == NULL) return 0;
+
+    pid_t pid = fork();
+    if (pid < 0)
+    {
+        perror("fork");
+        return 1;
+    }
+    
+    if (pid == 0)
+    {
+        applyInputRedirection(packet, 0, 1);
+        applyOutputRedirection(packet);
+
+        execExternalFromPath(command, packet->commandArgument);
+
+        perror("execv");
+        exit(EXIT_FAILURE);
+    }
+
+    int status;
+    waitpid(pid, &status, 0);
+
+    return WEXITSTATUS(status);
+}
+
+void runBuiltinInCmd(commandPacket *packet)
+{
+    char *cmd = packet->commandArgument[0];
+    int argc = countArgs(packet->commandArgument);
+
+    applyInputRedirection(packet, 0, 1);
+    applyOutputRedirection(packet);
+
+    if (strcmp(cmd, "pwd") == 0)
+        exit(runPWD(argc));
+
+    if (strcmp(cmd, "which") == 0)
+    {
+        if (argc != 2) exit(EXIT_FAILURE);
+
+        exit(runWhich(packet->commandArgument[1]));
+    }
+
+    exit(EXIT_FAILURE);
 }
 
 int runCommand(char *commandLine)
-{ // separated actual commands to make more modular
-    if (commandLine[0] == '#')
-        return EXIT_SUCCESS;
-    char line[BUFSIZE]; // copy of commandLine string
+{
+    if (commandLine[0] == '#') return EXIT_SUCCESS;
+
+    char line[BUFSIZE];
     strcpy(line, commandLine);
 
-    char *argv[MAX_ARGS];                              // array of arguments from commandLine
-    int argc = parseCommandLine(line, argv, MAX_ARGS); // number of arguments
+    commandPacket packet = buildPacket(line);
 
+    if (packet.commandArgument[0] == NULL)
+    {
+        freePacket(&packet);
+        return EXIT_SUCCESS;
+    }
+
+    int argc = countArgs(packet.commandArgument);
+    char *command = packet.commandArgument[0];
     int status = 0;
 
-    /* change status based on execution of the command */
-    if (strcmp(argv[0], "cd") == 0) // built-in cd command
+    if (strcmp(command, "cd") == 0)
     {
-        status = runCD(argc, argv);
+        status = runCD(argc, packet.commandArgument);
+
+        freePacket(&packet);
+        return status;
     }
-    else if (strcmp(argv[0], "pwd") == 0) // built-in pwd command
+
+    if (strcmp(command, "exit") == 0)
     {
-        status = runPWD(argc);
+        freePacket(&packet);
+        runExit();
     }
-    else if (strcmp(argv[0], "which") == 0)
-    { // built-in which command
-        if (argc != 2)
+
+    if (strcmp(command, "die") == 0)
+    {
+        runDie(argc, packet.commandArgument);
+    }
+
+    if (strcmp(command, "pwd") == 0 || strcmp(command, "which") == 0)
+    {
+        pid_t pid = fork();
+
+        if (pid == 0)
         {
-            status = 1;
-            return status;
+            if (!interactive && packet.inputFile == NULL)
+            {
+                int devnull = open("/dev/null", O_RDONLY);
+                dup2(devnull, STDIN_FILENO);
+                close(devnull);
+            }
+
+            runBuiltinInCmd(&packet);
         }
 
-        status = runWhich(argv[1]);
-    }
-    else if (strcmp(argv[0], "exit") == 0)
-    { // built-in exit command
-        status = runExit();
-    }
-    else if (strcmp(argv[0], "die") == 0)
-    { // built-in die command
-        status = runDie(argc, argv);
-    }
-    else
-    { // non-built-in commands
-        status = runNonBuiltInCommands(argv[0], argv);
+        int s;
+        waitpid(pid, &s, 0);
+        status = WEXITSTATUS(s);
+
+        freePacket(&packet);
+        return status;
     }
 
-    return status; // 0 if successful, 1 if command failed
-}
+    status = runSinglePacket(&packet);
 
-int runCommandWithArgv(char **argv)
-{
-    int argc = 0;
-    while (argv[argc] != NULL)
-        argc++;
-
-    int status = 0;
-
-    if (strcmp(argv[0], "cd") == 0)
-    {
-        status = runCD(argc, argv);
-    }
-    else if (strcmp(argv[0], "pwd") == 0)
-    {
-        status = runPWD(argc);
-    }
-    else if (strcmp(argv[0], "which") == 0)
-    {
-        if (argc != 2)
-        {
-            status = 1;
-            return status;
-        }
-        status = runWhich(argv[1]);
-    }
-    else if (strcmp(argv[0], "exit") == 0)
-    {
-        status = runExit();
-    }
-    else if (strcmp(argv[0], "die") == 0)
-    {
-        status = runDie(argc, argv);
-    }
-    else
-    {
-        status = runNonBuiltInCommands(argv[0], argv);
-    }
-
+    freePacket(&packet);
     return status;
 }
 
-int runPipeline(char *parsedPipes[][MAX_ARGS], int numProcesses)
+int findSegments(char *commandLine, char ***segments)
 {
-    int numberOfPipes = numProcesses - 1;
+    int capacity = 10;
+    int count = 0;
 
-    int pipes[numberOfPipes][2];
-    for (int i = 0; i < numberOfPipes; i++)
-    { // create all pipes
-        if (pipe(pipes[i]) < 0)
+    *segments = malloc(sizeof(char *) * capacity);
+    if(!*segments) return -1;
+
+    char *ptr;
+    char *segment = strtok_r(commandLine, "|", &ptr);
+
+    while(segment != NULL)
+    {
+        if(count == capacity)
         {
-            perror("pipe");
-            return EXIT_FAILURE;
+            capacity *= 2;
+
+            char **temp = realloc(*segments, sizeof(char *) * capacity);
+            if(!temp) return -1;
+
+            *segments = temp;
+        }
+        char *cleaned = trimWhitespace(segment);
+
+        (*segments)[count++] = strdup(cleaned);
+        
+        segment = strtok_r(NULL, "|", &ptr);
+    }
+
+    (*segments)[count] = NULL;
+
+    return count;
+
+}
+
+int handlePipeline(commandPacket *packets, int numCmds)
+{
+    int numPipes = numCmds - 1;
+    int pipes[numPipes][2];
+    pid_t pids[numCmds];
+
+    int stopAfter = numCmds;
+    int sawExitDie = 0;
+
+    for (int i = 0; i < numCmds; i++)
+    {
+        char *cmd = packets[i].commandArgument[0];
+        if (cmd && (!strcmp(cmd,"exit") || !strcmp(cmd,"die")))
+        {
+            stopAfter = i + 1;  // run up to and including this one
+            sawExitDie = 1;
+            break;
         }
     }
 
-    pid_t pids[numProcesses];
-    for (int i = 0; i < numProcesses; i++)
-    { // fork all processes
+    for (int i = 0; i < numPipes; i++) pipe(pipes[i]);
+
+    for (int i = 0; i < stopAfter; i++)
+    {
         pids[i] = fork();
 
         if (pids[i] == 0)
-        { // child process i
-            // if not first process, read from previous pipe
-            if (i > 0)
-            {
-                dup2(pipes[i - 1][0], STDIN_FILENO);
-            }
+        {
+            char *cmd = packets[i].commandArgument[0];
 
-            // if not last process, write to next pipe
-            if (i < numberOfPipes)
-            {
-                dup2(pipes[i][1], STDOUT_FILENO);
-            }
+            if (i > 0) dup2(pipes[i - 1][0], STDIN_FILENO);
 
-            // close all pipe file descriptors in child
-            for (int j = 0; j < numberOfPipes; j++)
+            if (i < stopAfter - 1) dup2(pipes[i][1], STDOUT_FILENO);
+
+            for (int j = 0; j < numPipes; j++)
             {
                 close(pipes[j][0]);
                 close(pipes[j][1]);
             }
 
-            int status = runCommandWithArgv(parsedPipes[i]);
-            exit(status);
+            applyInputRedirection(&packets[i], 1, i == 0);
+            applyOutputRedirection(&packets[i]);
+
+            if (cmd && (!strcmp(cmd,"cd") || !strcmp(cmd,"pwd") || !strcmp(cmd,"which") || !strcmp(cmd,"exit") || !strcmp(cmd,"die")))
+            {
+                runBuiltinInPipelineChild(&packets[i]);
+            }
+
+            execExternalFromPath(cmd, packets[i].commandArgument);
+            
+            exit(EXIT_FAILURE);
         }
     }
 
-    // parent closes all pipes
-    for (int i = 0; i < numberOfPipes; i++)
+    for (int i = 0; i < numPipes; i++)
     {
         close(pipes[i][0]);
         close(pipes[i][1]);
     }
 
-    // wait for all children
-    int lastStatus = 0;
-    for (int i = 0; i < numProcesses; i++)
+    for (int i = 0; i < stopAfter; i++)
     {
-        int status;
-        waitpid(pids[i], &status, 0);
-        if (i == numProcesses - 1)
-        {
-            lastStatus = WEXITSTATUS(status);
-        }
+        int s;
+        waitpid(pids[i], &s, 0);
     }
 
-    return lastStatus; // lastStatus is the only one that matters when determining pipeline success
+    if (sawExitDie)
+    {
+        char *cmd = packets[stopAfter - 1].commandArgument[0];
+
+        if (!strcmp(cmd, "exit"))
+            runExit();
+        else
+            runDie(countArgs(packets[stopAfter - 1].commandArgument), packets[stopAfter - 1].commandArgument);
+    }
+
+    return 0;
 }
 
 int main(int argc, char *argv[])
@@ -486,8 +684,6 @@ int main(int argc, char *argv[])
     }
 
     /* read from STDIN (may be terminal, may be batchFile) */
-    char buffer[BUFSIZE];
-
     char *commandLine = malloc(BUFSIZE);
     if (!commandLine)
     {
@@ -495,7 +691,9 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    char buffer[BUFSIZE];
     int bytes;
+
     int lineIndex = 0;
     int capacity = BUFSIZE;
 
@@ -508,11 +706,9 @@ int main(int argc, char *argv[])
         }
 
         bytes = read(STDIN_FILENO, buffer, BUFSIZE);
-
         if (bytes == 0)
         {
-            if (interactive)
-                printf("\n");
+            if (interactive) printf("\n");
             break;
         }
 
@@ -523,21 +719,49 @@ int main(int argc, char *argv[])
                 if (lineIndex > 0)
                 {
                     commandLine[lineIndex] = '\0';
+                    stripComments(commandLine);
 
-                    int runCommandStatus = 0;
-                    char commandLineCopy[BUFSIZE];
-                    strcpy(commandLineCopy, commandLine);
-                    char *parsedPipes[MAX_PIPES][MAX_ARGS];
-
-                    int numberOfPipes = parsePipeline(commandLineCopy, parsedPipes) - 1;
-
-                    if (numberOfPipes > 0)
-                    { // maybe add redirection option here too!
-                        runCommandStatus = runPipeline(parsedPipes, numberOfPipes + 1);
-                    }
-                    else
+                    if (commandLine[0] == '\0')
                     {
-                        runCommandStatus = runCommand(commandLine); // 0 if successful, 1 if failure [deal with failure/pipe/redirection logic later]
+                        lineIndex = 0;
+                        continue;
+                    }
+
+                    char commandCopy[BUFSIZE];
+                    strcpy(commandCopy, commandLine);
+
+                    char **segments;
+                    int numOfSegments = findSegments(commandCopy, &segments);
+
+                    if(numOfSegments <= 0)
+                    {
+                        free(segments);
+
+                        lineIndex = 0;
+                        continue;
+                    }
+
+                    if(numOfSegments > 1)
+                    {
+                        commandPacket *packets = malloc(sizeof(commandPacket) * numOfSegments);
+
+                        for(int s = 0; s < numOfSegments; s++) packets[s] = buildPacket(segments[s]);
+
+                        int status = handlePipeline(packets, numOfSegments);
+
+                        for (int s = 0; s < numOfSegments; s++)
+                        {
+                            freePacket(&packets[s]);
+                            free(segments[s]);
+                        }
+
+                        free(packets);
+                        free(segments);
+                    } else {
+                        runCommand(commandLine);
+
+                        free(segments[0]);
+                        free(segments);
                     }
 
                     lineIndex = 0;
@@ -557,7 +781,6 @@ int main(int argc, char *argv[])
 
                         return EXIT_FAILURE;
                     }
-
                     commandLine = temp;
                 }
 
@@ -569,10 +792,10 @@ int main(int argc, char *argv[])
     if (lineIndex > 0)
     { // is this actually being used? if so, might need to deal with pipelines differently here too!
         commandLine[lineIndex] = '\0';
-        int runCommandStatus = runCommand(commandLine); // 0 if successful, 1 if failure [deal with failure/pipe/redirection logic later]
-    }
+        stripComments(commandLine);
 
-    free(commandLine);
+        if (commandLine[0] != '\0') runCommand(commandLine);
+    }
 
     if (interactive)
     {
@@ -580,5 +803,6 @@ int main(int argc, char *argv[])
         fflush(stdout);
     }
 
+    free(commandLine);
     return EXIT_SUCCESS;
 }
