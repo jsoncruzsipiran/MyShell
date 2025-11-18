@@ -118,7 +118,7 @@ Therefore, testing commands in both modes would be redundant - if commands work 
     ix. noFirst(): Write a program, where conditional command = "and die whoops". [tbd behavior]
 
 4a. Requirement: Program correctly processes input and output redirection.
-4b. Detection method: TBD
+4b. Detection method: To detect this, we print out what is inside file.txt to see if it is correctly being redirected. 
 4c: Tests:
     i. basicOutputRedirection(): Write a program, where command = "echo test > file.txt".
     ii. basicInputRedirection(): Write a program, where command = "cat < file.txt"
@@ -147,7 +147,7 @@ Therefore, testing commands in both modes would be redundant - if commands work 
     v. whichFailure(): Write a program where command = "which hello". Program should print out nothing and fails since program cannot be found.
 
 4a. Requirement: exit ceases reading commands and terminates successfully with exit code 0. 
-4b. Detection method: TBD
+4b. Detection method: To detect this requirement, test program utilizes 'echo' command to test whether things will be printed after 'exit' command.
 4c. Tests:
     i. exitSuccess: Write a program in batch mode where commands = 
         "echo hello
