@@ -14,6 +14,7 @@
 
 static int interactive;
 static int lastStatus = -1;
+static char *commandBuffer = NULL;
 
 typedef struct {
     char** commandArgument;
@@ -686,40 +687,36 @@ int runCommand(char *commandLine)
     return lastStatus;
 }
 
-int main(int argc, char *argv[])
+int initializeShell(int argc, char *argv[])
 {
-    /* checks for arguments over the necessary amount, must be 1 or none */
     if (argc > 2)
     {
         fprintf(stderr, "Error: There should be at most 2 arguments.\n");
         return EXIT_FAILURE;
     }
 
-    /* batch mode is possible through 2 routes: program execution starts off with pipe redirecting STDIN or we are given an argument to redirect it manually */
     if (argc == 2)
     {
-        char *batchFile = argv[1]; // string to hold batch file
-
-        int status = runBatchFile(batchFile); // 0 if successful, 1 if failure
-
-        if (status != 0)
-        {
-            return EXIT_FAILURE;
-        }
+        char *batchFile = argv[1];
+        int status = runBatchFile(batchFile);
+        if (status != 0) return EXIT_FAILURE;
     }
 
-    interactive = isatty(STDIN_FILENO); // interactive flag using isatty() method
+    interactive = isatty(STDIN_FILENO);
 
-    /* print welcome message if we are interactive mode */
     if (interactive)
     {
         printWelcome();
         fflush(stdout);
     }
 
-    /* read from STDIN (may be terminal, may be batchFile) */
-    char *commandLine = malloc(BUFSIZE);
-    if (!commandLine)
+    return EXIT_SUCCESS;
+}
+
+int runShell()
+{
+    commandBuffer = malloc(BUFSIZE);
+    if (!commandBuffer)
     {
         fprintf(stderr, "Error: Memory allocation failed.\n");
         return EXIT_FAILURE;
@@ -733,57 +730,67 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-        if(interactive)
+        if (interactive)
         {
             printf("mysh> ");
             fflush(stdout);
         }
 
         bytes = read(STDIN_FILENO, buffer, BUFSIZE);
-
-        if(bytes == 0)
+        if (bytes == 0)
         {
-            if(interactive) printf("\n");
+            if (interactive) printf("\n");
             break;
         }
 
-        for(int i = 0; i < bytes; i++)
+        for (int i = 0; i < bytes; i++)
         {
-            if(buffer[i] == '\n')
+            if (buffer[i] == '\n')
             {
-                if(lineIndex > 0)
+                if (lineIndex > 0)
                 {
-                    commandLine[lineIndex] = '\0';
-
-                    runCommand(commandLine);
-
+                    commandBuffer[lineIndex] = '\0';
+                    runCommand(commandBuffer);
                     lineIndex = 0;
                 }
-            } else {
-                if(lineIndex >= capacity - 1)
+            }
+            else
+            {
+                if (lineIndex >= capacity - 1)
                 {
                     capacity *= 2;
-
-                    char *temp = realloc(commandLine, capacity);
-                    if(!temp)
+                    char *temp = realloc(commandBuffer, capacity);
+                    if (!temp)
                     {
                         fprintf(stderr, "Error: Memory reallocation failed.\n");
-                        free(commandLine);
+                        free(commandBuffer);
                         return EXIT_FAILURE;
                     }
-                    commandLine = temp;
+                    commandBuffer = temp;
                 }
 
-                commandLine[lineIndex++] = buffer[i];
+                commandBuffer[lineIndex++] = buffer[i];
             }
         }
     }
 
-    if(lineIndex > 0)
+    if (lineIndex > 0)
     {
-        commandLine[lineIndex] = '\0';
-        runCommand(commandLine);
+        commandBuffer[lineIndex] = '\0';
+        runCommand(commandBuffer);
     }
+
+    free(commandBuffer);
+
+    return EXIT_SUCCESS;
+}
+
+int main(int argc, char *argv[])
+{
+    if (initializeShell(argc, argv) != EXIT_SUCCESS)
+        return EXIT_FAILURE;
+
+    int result = runShell();
 
     if (interactive)
     {
@@ -791,6 +798,5 @@ int main(int argc, char *argv[])
         fflush(stdout);
     }
 
-    free(commandLine);
-    return EXIT_SUCCESS;
+    return result;
 }
