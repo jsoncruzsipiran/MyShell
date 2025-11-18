@@ -15,6 +15,7 @@
 static int interactive;
 static int lastStatus = -1;
 static char *commandBuffer = NULL;
+static int dieFlag = 0;
 
 /* data structure to hold command line information (the entire line, its input/output if redirection is present) */
 typedef struct {
@@ -195,13 +196,17 @@ int runExit()
 
 int runDie(const int argc, char **argv)
 {
-    for (int i = 1; i < argc; i++)
-    {
-        printf("%s ", argv[i]);
-    }
-    printf("\n");
+    if (argv != NULL) {
+        for (int i = 1; i < argc; i++)
+        {
+            printf("%s ", argv[i]);
+        }
+        printf("\n");
 
-    fflush(stdout);
+        fflush(stdout);
+    }
+
+    dieFlag = 1;
 
     if (interactive)
     {
@@ -385,7 +390,7 @@ void runSingleCommandInChild(char *cmd)
 
     if (strcmp(command, "exit") == 0) exit(EXIT_SUCCESS); // exits safely
 
-    if (strcmp(command, "die") == 0) exit(EXIT_FAILURE); // abortion
+    if (strcmp(command, "die") == 0) runDie(argc, packet.commandArgument); // abortion
 
     /* external commands within child */
     char *directories[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL}; // the only directories we will be searching
@@ -429,130 +434,157 @@ int runPipeline(char *line)
     char temp[BUFSIZE];
     strcpy(temp, line);
 
+    /* split pipeline into segments */
     int n = splitPipeline(temp, segments);
     if (n < 2) return 0;
 
+    /* Create n-1 pipes */
     int pipes[MAX_PIPES][2];
-
     for (int i = 0; i < n - 1; i++)
     {
         if (pipe(pipes[i]) < 0)
         {
             perror("pipe");
-            return 1;
+            return EXIT_FAILURE;
         }
     }
 
-    pid_t pids[MAX_PIPES];
+    /* fork once for each segment in the pipeline */
+    pid_t pids[MAX_PIPES]; // store PIDs of each pipeline process
 
     for (int i = 0; i < n; i++)
     {
         pids[i] = fork();
+
         if (pids[i] == 0)
         {
+            /* if not first command: pipe previous -> STDIN */
             if (i > 0)
             {
                 dup2(pipes[i-1][0], STDIN_FILENO);
-            } else if (!isatty(STDIN_FILENO) ) {
-                applyDevNullIfBatchNoInput();
-            }
-
-            if (i < n - 1)
+            } else if (!isatty(STDIN_FILENO)) 
             {
-                dup2(pipes[i][1], STDOUT_FILENO);
+                applyDevNullIfBatchNoInput(); // first command in batch mode; redirect STDIN to /dev/null
             }
 
+            /* if not last command: pipe STDOUT -> next pipe */
+            if (i < n - 1) dup2(pipes[i][1], STDOUT_FILENO);
+
+            /* close all pipe fds in child */
             for (int j = 0; j < n - 1; j++)
             {
                 close(pipes[j][0]);
                 close(pipes[j][1]);
             }
 
-            runSingleCommandInChild(segments[i]);
+            /* Execute the command segment */
+            runSingleCommandInChild(segments[i]); 
         }
     }
 
+    /* parent process closes all pipe ends */
     for (int i = 0; i < n - 1; i++)
     {
         close(pipes[i][0]);
         close(pipes[i][1]);
     }
 
+    /* pipeline result = last command's status */
     int status = 0;
-    for (int i = 0; i < n; i++)
-    {
+
+    for (int i = 0; i < n; i++) {
         int s;
         waitpid(pids[i], &s, 0);
+        int code = WEXITSTATUS(s);
 
-        if (i == n - 1)
-            status = WEXITSTATUS(s);
+        /* If any child ran die(), terminate entire shell */
+        if (dieFlag) {
+            runDie(1, NULL);
+        }
+
+        if (i == n - 1) status = code;
     }
 
-    return status;
+    return status; // last process determines pipeline status
 }
 
+/* function that processes command line and acts accordingly to the arguments given; function acts as dispatcher between pipelines and regular commands */
 int runCommand(char *commandLine)
 {
+    /* ignore NULL input */
     if(!commandLine) return 0;
 
+    /* strip comments from command line and leading/trailing whitespace */
     stripComments(commandLine);
     char *line = trimWhitespace(commandLine);
     if(*line == '\0') return 0;
 
+    /* checks for conditional operators */
     int isAnd = 0, isOr = 0;
 
+    /* safe tokenization process of command line */
     char copy[BUFSIZE];
-    strcpy(copy, line);
+    strcpy(copy, line); // copy
 
-    char *firstTok = strtok(copy, " \t");
-    if (firstTok && strcmp(firstTok, "and") == 0)  isAnd = 1;
-    if (firstTok && strcmp(firstTok, "or")  == 0)  isOr  = 1;
+    char *firstTok = strtok(copy, " \t"); // first token (needed to flag conditional operators)
 
-    if ((isAnd || isOr) && lastStatus == -1) {
-        fprintf(stderr, "Syntax error: conditional cannot be first command.\n");
-        lastStatus = 1;
-        return 1;
-    }
+    /* set flag for conditional operator */
+    if (firstTok && strcmp(firstTok, "and") == 0) isAnd = 1;
+    if (firstTok && strcmp(firstTok, "or")  == 0) isOr  = 1;
 
-    if (isAnd && lastStatus != 0) {
-        return lastStatus;   // skip execution
-    }
-    if (isOr && lastStatus == 0) {
-        return lastStatus;   // skip execution
-    }
-
-    char *cmdStart = line;
-    if (isAnd || isOr)
+    if ((isAnd || isOr) && lastStatus == -1) // fail check if conditional operator given before a completed command
     {
-        cmdStart += strlen(firstTok);
+        fprintf(stderr, "Error: Conditional cannot be first command.\n");
+
+        lastStatus = 1;
+        return EXIT_FAILURE;
+    }
+
+    /* conditional operators run only if previous succeeded */
+    if (isAnd && lastStatus != 0) return lastStatus;   // skip execution
+    if (isOr && lastStatus == 0) return lastStatus;   // skip execution
+
+    /* CONDITIONAL OPERATOR command execution */
+    char *cmdStart = line; // original copy of command line
+
+    if (isAnd || isOr) // operator found 
+    {
+        /* parse the line right after operator */
+        cmdStart += strlen(firstTok); 
         while (*cmdStart == ' ' || *cmdStart == '\t') cmdStart++;
         cmdStart = trimWhitespace(cmdStart);
     }
 
-    if (*cmdStart == '\0') return 0;
+    if (*cmdStart == '\0') return EXIT_SUCCESS; // nothing left to execute
 
-    if(strchr(cmdStart, '|') != NULL) 
+
+    /* PIPELINE detection and execution */
+    if(strchr(cmdStart, '|') != NULL) // pipeline detected
     {
+        /* ensure conditionals do NOT appear inside a pipeline */
         if (strstr(cmdStart, " and ") != NULL || strstr(cmdStart, " or ")  != NULL)
         {
             fprintf(stderr, "Error: conditional operators cannot appear inside a pipeline.\n");
+
             lastStatus = 1;
-            return 1;
+            return EXIT_FAILURE;
         }
         
-        int status = runPipeline(cmdStart);
+        int status = runPipeline(cmdStart); // run pipeline
 
+        /* If pipeline contained exit/die, shell must terminate */
         if (strstr(cmdStart, "exit") != NULL) runExit();
-        if (strstr(cmdStart, "die")  != NULL) runDie(1, NULL);
 
+        /* record pipeline exit status for future and/or */
         lastStatus = status;
         return status;
-
     }
 
+    /* SIMPLE COMMANDS -> tokenize and build commandPacket for redirection parsing */
     char temp[BUFSIZE];
     strcpy(temp, cmdStart);
 
+    /* tokenization */
     int tokenCount = 0;
     char **tokens = tokenize(temp, &tokenCount);
     if(tokenCount == 0)
@@ -561,22 +593,28 @@ int runCommand(char *commandLine)
         return 0;
     }
 
+    /* extract args + redirection into a packet structure */
     commandPacket packet = buildPacket(tokens, tokenCount);
     free(tokens);
 
+    /* commandArgument[0] is the executable name */
     if(packet.commandArgument[0] == NULL)
     {
         freePacket(&packet);
         return 0;
     }
 
+    /* compute argument count */
     char *command = packet.commandArgument[0];
+
     int argc = 0;
     while(packet.commandArgument[argc] != NULL) argc++;
 
+    /* flags to identify if command is a built-in && if redirection is used */
     int isBuiltin = strcmp(command, "cd") == 0 || strcmp(command, "pwd") == 0 || strcmp(command, "which") == 0 || strcmp(command, "exit") == 0 || strcmp(command, "die")  == 0;
     int hasRedirection = (packet.inputFile != NULL || packet.outputFile != NULL);
 
+    /* BUILT-INS WITHOUT REDIRECTION (run directly in parent) */
     if(isBuiltin && !hasRedirection)
     {
         int status = 0;
@@ -615,7 +653,7 @@ int runCommand(char *commandLine)
         return status;
     }
 
-
+    /* BUILT-INS WITH REDIRECTION */
     if(isBuiltin && hasRedirection)
     {
         pid_t pid = fork();
@@ -672,51 +710,63 @@ int runCommand(char *commandLine)
         return WEXITSTATUS(status);
     }
 
+    /* EXTERNAL COMMAND (fork + exec) */
     pid_t pid = fork();
-    if (pid == 0)
+    if (pid == 0) // child process
     {
-        /* CHILD: apply redirection */
+        /* apply input redirection OR dev/null rule */
         if (packet.inputFile != NULL) 
         {
             int fd = open(packet.inputFile, O_RDONLY);
-            if (fd < 0) exit(1);
+            if (fd < 0) exit(EXIT_FAILURE);
+
             dup2(fd, STDIN_FILENO);
             close(fd);
         } else if (!isatty(STDIN_FILENO)) {
             applyDevNullIfBatchNoInput();
         }
 
-
+        /* apply output redirection */
         if (packet.outputFile != NULL) 
         {
             int fd = open(packet.outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
-            if (fd < 0) exit(1);
+            if (fd < 0) exit(EXIT_FAILURE);
+
             dup2(fd, STDOUT_FILENO);
             close(fd);
         }
 
-        char *dirs[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL};
-        if (access(command, X_OK) == 0)
-            execv(command, packet.commandArgument);
+        char *directories[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL};  // the only directories we will be searching for
 
+        /* check if program is passable as it stands */
+        if (access(command, X_OK) == 0) execv(command, packet.commandArgument);
+
+        /* another check if program is a bare name and passable by appending specified directories */
         char path[BUFSIZE];
-        for (int i = 0; dirs[i] != NULL; i++) {
-            snprintf(path, BUFSIZE, "%s/%s", dirs[i], command);
-            if (access(path, X_OK) == 0)
-                execv(path, packet.commandArgument);
+        for (int i = 0; directories[i] != NULL; i++) {
+            snprintf(path, BUFSIZE, "%s/%s", directories[i], command);
+
+            if (access(path, X_OK) == 0) execv(path, packet.commandArgument);
         }
 
-        /* nothing found -> exit failure */
         exit(EXIT_FAILURE);
-
 
     }
 
+    /* parent process waits for external command */
     int status;
     waitpid(pid, &status, 0);
+    int code = WEXITSTATUS(status);
+
+    /* If child executed die(), terminate entire shell */
+    if (dieFlag) {
+        runDie(1, NULL);
+    }
 
     freePacket(&packet);
-    lastStatus = WEXITSTATUS(status);
+
+    /* store exit status for future AND/OR conditions */
+    lastStatus = code;
     return lastStatus;
 }
 
