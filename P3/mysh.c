@@ -13,6 +13,7 @@
 #define MAX_PIPES 100
 
 static int interactive;
+static int lastStatus = -1;
 
 typedef struct {
     char** commandArgument;
@@ -43,6 +44,16 @@ int runBatchFile(char *batchFile)
     close(fd); // free link between the batchFile and its original fd
 
     return 0;
+}
+
+void applyDevNullIfBatchNoInput() {
+    if (!interactive) {
+        int devnull = open("/dev/null", O_RDONLY);
+        if (devnull >= 0) {
+            dup2(devnull, STDIN_FILENO);
+            close(devnull);
+        }
+    }
 }
 
 int runPWD(int argc)
@@ -195,461 +206,484 @@ int runDie(const int argc, char **argv)
     exit(EXIT_FAILURE);
 }
 
-char *trimWhitespace(char *string)
-{
-    if (string == NULL)
-        return NULL;
-    while (isspace((unsigned char)*string))
-        string++;
-    char *end = string + strlen(string) - 1;
-    while (end > string && isspace((unsigned char)*end))
-        end--;
-    *(end + 1) = '\0';
-    return string;
-}
-
 void stripComments(char *line)
 {
-    char *hash = strchr(line, '#');
-    if (hash)
-        *hash = '\0';
+    char *p = strchr(line, '#');
+    if (p) *p = '\0';
 }
 
-int countArgs(char **argv)
+char *trimWhitespace(char *s)
 {
-    int n = 0;
-    while (argv[n] != NULL) n++;
+    while (isspace((unsigned char)*s)) s++;
 
-    return n;
+    if (*s == '\0') return s;
+
+    char *end = s + strlen(s) - 1;
+    while (end > s && isspace((unsigned char)*end)) end--;
+
+    *(end + 1) = '\0';
+    return s;
 }
 
-void applyInputRedirection(commandPacket *packet, int isPipeline, int isFirstSegment)
+char **tokenize(char *line, int *count)
 {
-    if (!interactive && packet->inputFile == NULL && (!isPipeline || isFirstSegment))
+    int capacity = 10;
+    char **tokens = malloc(sizeof(char *) * capacity);
+    *count = 0;
+
+    char *token = strtok(line, " \t\n");
+
+    while(token)
     {
-        int devnull = open("/dev/null", O_RDONLY);
-        if (devnull < 0)
+        if (*count >= capacity - 1)
         {
-            perror("open /dev/null");
-            exit(EXIT_FAILURE);
+            capacity *= 2;
+            tokens = realloc(tokens, sizeof(char*) * capacity);
         }
-        dup2(devnull, STDIN_FILENO);
-        close(devnull);
+
+        tokens[*count] = token;
+        (*count)++;
+
+        token = strtok(NULL, " \t\n");
     }
 
-    if (packet->inputFile != NULL)
+    tokens[*count] = NULL;
+    return tokens;
+}
+
+commandPacket buildPacket(char **tokens, int count)
+{
+    commandPacket p;
+    p.inputFile = NULL;
+    p.outputFile = NULL;
+
+    p.commandArgument = malloc(sizeof(char*) * (count + 1));
+    int argc = 0;
+
+    for (int i = 0; i < count; i++)
     {
-        int fd = open(packet->inputFile, O_RDONLY);
-        if (fd < 0)
+        if (strcmp(tokens[i], "<") == 0)
         {
-            perror("open input");
-            exit(EXIT_FAILURE);
+            if (i + 1 < count)
+                p.inputFile = strdup(tokens[++i]);
         }
+        else if (strcmp(tokens[i], ">") == 0)
+        {
+            if (i + 1 < count)
+                p.outputFile = strdup(tokens[++i]);
+        }
+        else
+        {
+            p.commandArgument[argc++] = strdup(tokens[i]);
+        }
+    }
+
+    p.commandArgument[argc] = NULL;
+    return p;
+}
+
+void freePacket(commandPacket *p)
+{
+    if (!p) return;
+
+    if (p->commandArgument)
+    {
+        for (int i = 0; p->commandArgument[i] != NULL; i++)
+        {
+            free(p->commandArgument[i]);
+        }
+        free(p->commandArgument);
+        p->commandArgument = NULL;
+    }
+
+    if (p->inputFile)
+    {
+        free(p->inputFile);
+        p->inputFile = NULL;
+    }
+
+    if (p->outputFile)
+    {
+        free(p->outputFile);
+        p->outputFile = NULL;
+    }
+}
+
+void runSingleCommandInChild(char *cmd)
+{
+    char temp[BUFSIZE];
+    strcpy(temp, cmd);
+
+    int tokenCount = 0;
+    char **tokens = tokenize(temp, &tokenCount);
+    commandPacket packet = buildPacket(tokens, tokenCount);
+
+    free(tokens);
+
+    if (packet.inputFile == NULL && !interactive) {
+        applyDevNullIfBatchNoInput();
+    }
+
+
+    char *command = packet.commandArgument[0];
+    int argc = 0;
+    while(packet.commandArgument[argc]) argc++;
+
+    /* apply redirection */
+    if (packet.inputFile)
+    {
+        int fd = open(packet.inputFile, O_RDONLY);
+        if (fd < 0) exit(1);
 
         dup2(fd, STDIN_FILENO);
         close(fd);
     }
-}
 
-void applyOutputRedirection(commandPacket *packet)
-{
-    if (packet->outputFile != NULL)
+    if (packet.outputFile)
     {
-        int fd = open(packet->outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
-        if (fd < 0)
-        {
-            perror("open output");
-            exit(EXIT_FAILURE);
-        }
-
+        int fd = open(packet.outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
+        if (fd < 0) exit(1);
         dup2(fd, STDOUT_FILENO);
         close(fd);
     }
-}
 
-void execExternalFromPath(char *command, char **argv)
-{
-    char *dirs[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL};
-    char path[BUFSIZE];
-
-    if (access(command, X_OK) == 0)
+    /* built-ins in child */
+    if (strcmp(command, "cd") == 0) exit(runCD(argc, packet.commandArgument));
+    if (strcmp(command, "pwd") == 0) exit(runPWD(argc));
+    if (strcmp(command, "which") == 0)
     {
-        execv(command, argv);
-        perror("execv");
-        exit(EXIT_FAILURE);
+        if (argc != 2) exit(1);
+        exit(runWhich(packet.commandArgument[1]));
     }
+    if (strcmp(command, "exit") == 0) exit(0);
+    if (strcmp(command, "die") == 0) exit(1);
 
-    for (int i = 0; dirs[i] != NULL; i++)
+    /* external command */
+    char *dirs[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL};
+    if (access(command, X_OK) == 0)
+        execv(command, packet.commandArgument);
+
+    char path[BUFSIZE];
+    for (int i = 0; dirs[i]; i++)
     {
         snprintf(path, sizeof(path), "%s/%s", dirs[i], command);
         if (access(path, X_OK) == 0)
-        {
-            execv(path, argv);
-            perror("execv");
-            exit(EXIT_FAILURE);
-        }
+            execv(path, packet.commandArgument);
     }
 
-    exit(EXIT_FAILURE);
+    exit(1);
 }
 
-void runBuiltinInPipelineChild(commandPacket *packet)
+int splitPipeline(char *line, char *segments[])
 {
-    char *cmd = packet->commandArgument[0];
-    int argc = countArgs(packet->commandArgument);
-
-    if (strcmp(cmd, "cd") == 0)
-    {
-        int rc = runCD(argc, packet->commandArgument);
-        exit(rc);
-    }
-
-    if (strcmp(cmd, "pwd") == 0)
-    {
-        int rc = runPWD(argc);
-        exit(rc);
-    }
-
-    if (strcmp(cmd, "which") == 0)
-    {
-        if (argc != 2) exit(EXIT_FAILURE);
-
-        int rc = runWhich(packet->commandArgument[1]);
-        exit(rc);
-    }
-
-    if (strcmp(cmd, "exit") == 0)
-    {
-        exit(EXIT_SUCCESS);
-    }
-
-    if (strcmp(cmd, "die") == 0)
-    {
-        exit(EXIT_FAILURE);
-    }
-
-    exit(EXIT_FAILURE);
-}
-
-void freePacket(commandPacket *packet)
-{
-    for (int i = 0; packet->commandArgument[i] != NULL; i++) free(packet->commandArgument[i]);
-
-    free(packet->commandArgument);
-
-    if (packet->inputFile) free(packet->inputFile);
-
-    if (packet->outputFile) free(packet->outputFile);
-}
-
-/* function to parse command line into array of arguments */
-char** tokenize(char *commandLine, int *numOfTokens)
-{
-    int capacity = 10;
     int count = 0;
+    char *saveptr;
+    char *token = strtok_r(line, "|", &saveptr);
 
-    char **tokens = malloc(sizeof(char *) * capacity);
-    if(!tokens) return NULL;
-
-    char *token = strtok(commandLine, " \t\n");
-
-    while(token != NULL)
+    while(token && count < MAX_PIPES)
     {
-        if(count == capacity - 1)
-        {
-            capacity *= 2;
-
-            char **temp = realloc(tokens, sizeof(char *) * capacity);
-            if(!temp)
-            {
-                free(tokens);
-                return NULL;
-            }
-            tokens = temp;
-        }
-
-        tokens[count++] = token;
-        token = strtok(NULL, " \t\n");
+        segments[count++] = trimWhitespace(token);
+        token = strtok_r(NULL, "|", &saveptr);
     }
-
-    tokens[count] = NULL; // terminating value for execv()
-    *numOfTokens = count;
-
-    return tokens; // return number of arguments
-}
-
-commandPacket buildPacket(char *segment)
-{
-    commandPacket packet;
-    packet.inputFile = NULL;
-    packet.outputFile = NULL;
-    packet.commandArgument = malloc(sizeof(char*) * MAX_ARGS);
-    
-    for (int k = 0; k < MAX_ARGS; k++) packet.commandArgument[k] = NULL;
-
-    int argc = 0;
-    int tokenCount = 0;
-
-    char temp[BUFSIZE];
-    strcpy(temp, segment);
-
-    char **tokens = tokenize(temp, &tokenCount);
-
-    for (int i = 0; i < tokenCount; i++)
-    {
-        if (strcmp(tokens[i], "<") == 0)
-        {
-            if (i + 1 < tokenCount) packet.inputFile = strdup(tokens[i + 1]);
-            i++;
-        }
-        else if (strcmp(tokens[i], ">") == 0)
-        {
-            if (i + 1 < tokenCount) packet.outputFile = strdup(tokens[i + 1]);
-            i++;
-        }
-        else
-        {
-            packet.commandArgument[argc++] = strdup(tokens[i]);
-        }
-    }
-
-    packet.commandArgument[argc] = NULL;
-    free(tokens);
-
-    return packet;
-}
-
-/* function to run commands not directly built-in to the mysh program */
-int runSinglePacket(commandPacket *packet)
-{
-    char *command = packet->commandArgument[0];
-    if(command == NULL) return 0;
-
-    pid_t pid = fork();
-    if (pid < 0)
-    {
-        perror("fork");
-        return 1;
-    }
-    
-    if (pid == 0)
-    {
-        applyInputRedirection(packet, 0, 1);
-        applyOutputRedirection(packet);
-
-        execExternalFromPath(command, packet->commandArgument);
-
-        perror("execv");
-        exit(EXIT_FAILURE);
-    }
-
-    int status;
-    waitpid(pid, &status, 0);
-
-    return WEXITSTATUS(status);
-}
-
-void runBuiltinInCmd(commandPacket *packet)
-{
-    char *cmd = packet->commandArgument[0];
-    int argc = countArgs(packet->commandArgument);
-
-    applyInputRedirection(packet, 0, 1);
-    applyOutputRedirection(packet);
-
-    if (strcmp(cmd, "pwd") == 0)
-        exit(runPWD(argc));
-
-    if (strcmp(cmd, "which") == 0)
-    {
-        if (argc != 2) exit(EXIT_FAILURE);
-
-        exit(runWhich(packet->commandArgument[1]));
-    }
-
-    exit(EXIT_FAILURE);
-}
-
-int runCommand(char *commandLine)
-{
-    if (commandLine[0] == '#') return EXIT_SUCCESS;
-
-    char line[BUFSIZE];
-    strcpy(line, commandLine);
-
-    commandPacket packet = buildPacket(line);
-
-    if (packet.commandArgument[0] == NULL)
-    {
-        freePacket(&packet);
-        return EXIT_SUCCESS;
-    }
-
-    int argc = countArgs(packet.commandArgument);
-    char *command = packet.commandArgument[0];
-    int status = 0;
-
-    if (strcmp(command, "cd") == 0)
-    {
-        status = runCD(argc, packet.commandArgument);
-
-        freePacket(&packet);
-        return status;
-    }
-
-    if (strcmp(command, "exit") == 0)
-    {
-        freePacket(&packet);
-        runExit();
-    }
-
-    if (strcmp(command, "die") == 0)
-    {
-        runDie(argc, packet.commandArgument);
-    }
-
-    if (strcmp(command, "pwd") == 0 || strcmp(command, "which") == 0)
-    {
-        pid_t pid = fork();
-
-        if (pid == 0)
-        {
-            if (!interactive && packet.inputFile == NULL)
-            {
-                int devnull = open("/dev/null", O_RDONLY);
-                dup2(devnull, STDIN_FILENO);
-                close(devnull);
-            }
-
-            runBuiltinInCmd(&packet);
-        }
-
-        int s;
-        waitpid(pid, &s, 0);
-        status = WEXITSTATUS(s);
-
-        freePacket(&packet);
-        return status;
-    }
-
-    status = runSinglePacket(&packet);
-
-    freePacket(&packet);
-    return status;
-}
-
-int findSegments(char *commandLine, char ***segments)
-{
-    int capacity = 10;
-    int count = 0;
-
-    *segments = malloc(sizeof(char *) * capacity);
-    if(!*segments) return -1;
-
-    char *ptr;
-    char *segment = strtok_r(commandLine, "|", &ptr);
-
-    while(segment != NULL)
-    {
-        if(count == capacity)
-        {
-            capacity *= 2;
-
-            char **temp = realloc(*segments, sizeof(char *) * capacity);
-            if(!temp) return -1;
-
-            *segments = temp;
-        }
-        char *cleaned = trimWhitespace(segment);
-
-        (*segments)[count++] = strdup(cleaned);
-        
-        segment = strtok_r(NULL, "|", &ptr);
-    }
-
-    (*segments)[count] = NULL;
 
     return count;
-
 }
 
-int handlePipeline(commandPacket *packets, int numCmds)
+int runPipeline(char *line)
 {
-    int numPipes = numCmds - 1;
-    int pipes[numPipes][2];
-    pid_t pids[numCmds];
+    char *segments[MAX_PIPES];
+    char temp[BUFSIZE];
+    strcpy(temp, line);
 
-    int stopAfter = numCmds;
-    int sawExitDie = 0;
+    int n = splitPipeline(temp, segments);
+    if (n < 2) return 0;
 
-    for (int i = 0; i < numCmds; i++)
+    int pipes[MAX_PIPES][2];
+
+    for (int i = 0; i < n - 1; i++)
     {
-        char *cmd = packets[i].commandArgument[0];
-        if (cmd && (!strcmp(cmd,"exit") || !strcmp(cmd,"die")))
+        if (pipe(pipes[i]) < 0)
         {
-            stopAfter = i + 1;  // run up to and including this one
-            sawExitDie = 1;
-            break;
+            perror("pipe");
+            return 1;
         }
     }
 
-    for (int i = 0; i < numPipes; i++) pipe(pipes[i]);
+    pid_t pids[MAX_PIPES];
 
-    for (int i = 0; i < stopAfter; i++)
+    for (int i = 0; i < n; i++)
     {
         pids[i] = fork();
-
         if (pids[i] == 0)
         {
-            char *cmd = packets[i].commandArgument[0];
+            if (i > 0)
+            {
+                dup2(pipes[i-1][0], STDIN_FILENO);
+            } else if (!interactive) {
+                applyDevNullIfBatchNoInput();
+            }
 
-            if (i > 0) dup2(pipes[i - 1][0], STDIN_FILENO);
+            if (i < n - 1)
+            {
+                dup2(pipes[i][1], STDOUT_FILENO);
+            }
 
-            if (i < stopAfter - 1) dup2(pipes[i][1], STDOUT_FILENO);
-
-            for (int j = 0; j < numPipes; j++)
+            for (int j = 0; j < n - 1; j++)
             {
                 close(pipes[j][0]);
                 close(pipes[j][1]);
             }
 
-            applyInputRedirection(&packets[i], 1, i == 0);
-            applyOutputRedirection(&packets[i]);
-
-            if (cmd && (!strcmp(cmd,"cd") || !strcmp(cmd,"pwd") || !strcmp(cmd,"which") || !strcmp(cmd,"exit") || !strcmp(cmd,"die")))
-            {
-                runBuiltinInPipelineChild(&packets[i]);
-            }
-
-            execExternalFromPath(cmd, packets[i].commandArgument);
-            
-            exit(EXIT_FAILURE);
+            runSingleCommandInChild(segments[i]);
         }
     }
 
-    for (int i = 0; i < numPipes; i++)
+    for (int i = 0; i < n - 1; i++)
     {
         close(pipes[i][0]);
         close(pipes[i][1]);
     }
 
-    for (int i = 0; i < stopAfter; i++)
+    int status = 0;
+    for (int i = 0; i < n; i++)
     {
         int s;
         waitpid(pids[i], &s, 0);
+
+        if (i == n - 1)
+            status = WEXITSTATUS(s);
     }
 
-    if (sawExitDie)
+    return status;
+}
+
+int runCommand(char *commandLine)
+{
+    if(!commandLine) return 0;
+
+    stripComments(commandLine);
+    char *line = trimWhitespace(commandLine);
+    if(*line == '\0') return 0;
+
+    int isAnd = 0, isOr = 0;
+
+    char copy[BUFSIZE];
+    strcpy(copy, line);
+
+    char *firstTok = strtok(copy, " \t");
+    if (firstTok && strcmp(firstTok, "and") == 0)  isAnd = 1;
+    if (firstTok && strcmp(firstTok, "or")  == 0)  isOr  = 1;
+
+    if ((isAnd || isOr) && lastStatus == -1) {
+        fprintf(stderr, "Syntax error: conditional cannot be first command.\n");
+        lastStatus = 1;
+        return 1;
+    }
+
+    if (isAnd && lastStatus != 0) {
+        return lastStatus;   // skip execution
+    }
+    if (isOr && lastStatus == 0) {
+        return lastStatus;   // skip execution
+    }
+
+    char *cmdStart = line;
+    if (isAnd || isOr)
     {
-        char *cmd = packets[stopAfter - 1].commandArgument[0];
-
-        if (!strcmp(cmd, "exit"))
-            runExit();
-        else
-            runDie(countArgs(packets[stopAfter - 1].commandArgument), packets[stopAfter - 1].commandArgument);
+        cmdStart += strlen(firstTok);
+        while (*cmdStart == ' ' || *cmdStart == '\t') cmdStart++;
+        cmdStart = trimWhitespace(cmdStart);
     }
 
-    return 0;
+    if (*cmdStart == '\0') return 0;
+
+    if(strchr(cmdStart, '|') != NULL) 
+    {
+        if (strstr(cmdStart, " and ") != NULL || strstr(cmdStart, " or ")  != NULL)
+        {
+            fprintf(stderr, "Error: conditional operators cannot appear inside a pipeline.\n");
+            lastStatus = 1;
+            return 1;
+        }
+        
+        int status = runPipeline(cmdStart);
+
+        if (strstr(cmdStart, "exit") != NULL) runExit();
+        if (strstr(cmdStart, "die")  != NULL) runDie(1, NULL);
+
+        lastStatus = status;
+        return status;
+
+    }
+
+    char temp[BUFSIZE];
+    strcpy(temp, cmdStart);
+
+    int tokenCount = 0;
+    char **tokens = tokenize(temp, &tokenCount);
+    if(tokenCount == 0)
+    {
+        free(tokens);
+        return 0;
+    }
+
+    commandPacket packet = buildPacket(tokens, tokenCount);
+    free(tokens);
+
+    if(packet.commandArgument[0] == NULL)
+    {
+        freePacket(&packet);
+        return 0;
+    }
+
+    char *command = packet.commandArgument[0];
+    int argc = 0;
+    while(packet.commandArgument[argc] != NULL) argc++;
+
+    int isBuiltin = strcmp(command, "cd") == 0 || strcmp(command, "pwd") == 0 || strcmp(command, "which") == 0 || strcmp(command, "exit") == 0 || strcmp(command, "die")  == 0;
+    int hasRedirection = (packet.inputFile != NULL || packet.outputFile != NULL);
+
+    if(isBuiltin && !hasRedirection)
+    {
+        int status = 0;
+
+        if (strcmp(command, "cd") == 0) 
+        {
+            status = runCD(argc, packet.commandArgument);
+            freePacket(&packet);
+            return status;
+        }
+        else if (strcmp(command, "pwd") == 0) 
+        {
+            status = runPWD(argc);
+            freePacket(&packet);
+            return status;
+        }
+        else if (strcmp(command, "which") == 0) 
+        {
+            if (argc != 2) status = 1;
+            else status = runWhich(packet.commandArgument[1]);
+            freePacket(&packet);
+            return status;
+        }
+        else if (strcmp(command, "exit") == 0) 
+        {
+            freePacket(&packet);     
+            runExit();               
+        }
+        else if (strcmp(command, "die") == 0) 
+        {
+            runDie(argc, packet.commandArgument);
+        }
+        
+        freePacket(&packet);
+        lastStatus = status;
+        return status;
+    }
+
+
+    if(isBuiltin && hasRedirection)
+    {
+        pid_t pid = fork();
+        
+        if(pid == 0)
+        {
+            if(packet.inputFile != NULL)
+            {
+                int fd = open(packet.inputFile, O_RDONLY);
+                if(fd < 0) exit(EXIT_FAILURE);
+
+                dup2(fd, STDIN_FILENO);
+                close(fd);
+            } else if (!interactive) {
+                applyDevNullIfBatchNoInput();
+            }
+ 
+            if(packet.outputFile != NULL)
+            {
+                int fd = open(packet.outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
+                if(fd < 0) exit(EXIT_FAILURE);
+
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+            }
+
+            if (strcmp(command, "pwd") == 0) exit(runPWD(argc));
+
+            if (strcmp(command, "which") == 0) {
+                if (argc != 2) exit(EXIT_FAILURE);
+                exit(runWhich(packet.commandArgument[1]));
+            }
+
+            if (strcmp(command, "exit") == 0) exit(EXIT_SUCCESS);
+
+            if (strcmp(command, "die") == 0) exit(EXIT_FAILURE);
+
+            exit(EXIT_FAILURE);
+        }
+
+        int status;
+        waitpid(pid, &status, 0);
+
+        if (strcmp(command, "exit") == 0) {
+            freePacket(&packet);
+            runExit();
+        }
+        if (strcmp(command, "die") == 0) {
+            runDie(argc, packet.commandArgument);
+        }
+
+        freePacket(&packet);
+        lastStatus = status;
+        return WEXITSTATUS(status);
+    }
+
+    pid_t pid = fork();
+    if (pid == 0)
+    {
+        /* CHILD: apply redirection */
+        if (packet.inputFile != NULL) 
+        {
+            int fd = open(packet.inputFile, O_RDONLY);
+            if (fd < 0) exit(1);
+            dup2(fd, STDIN_FILENO);
+            close(fd);
+        } else if (!interactive) {
+            applyDevNullIfBatchNoInput();
+        }
+
+
+        if (packet.outputFile != NULL) 
+        {
+            int fd = open(packet.outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
+            if (fd < 0) exit(1);
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+        }
+
+        char *dirs[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL};
+        if (access(command, X_OK) == 0)
+            execv(command, packet.commandArgument);
+
+        char path[BUFSIZE];
+        for (int i = 0; dirs[i] != NULL; i++) {
+            snprintf(path, BUFSIZE, "%s/%s", dirs[i], command);
+            if (access(path, X_OK) == 0)
+                execv(path, packet.commandArgument);
+        }
+
+        /* nothing found -> exit failure */
+        exit(EXIT_FAILURE);
+
+
+    }
+
+    int status;
+    waitpid(pid, &status, 0);
+
+    freePacket(&packet);
+    lastStatus = WEXITSTATUS(status);
+    return lastStatus;
 }
 
 int main(int argc, char *argv[])
@@ -699,86 +733,42 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-        if (interactive)
+        if(interactive)
         {
             printf("mysh> ");
             fflush(stdout);
         }
 
         bytes = read(STDIN_FILENO, buffer, BUFSIZE);
-        if (bytes == 0)
+
+        if(bytes == 0)
         {
-            if (interactive) printf("\n");
+            if(interactive) printf("\n");
             break;
         }
 
-        for (int i = 0; i < bytes; i++)
+        for(int i = 0; i < bytes; i++)
         {
-            if (buffer[i] == '\n')
+            if(buffer[i] == '\n')
             {
-                if (lineIndex > 0)
+                if(lineIndex > 0)
                 {
                     commandLine[lineIndex] = '\0';
-                    stripComments(commandLine);
 
-                    if (commandLine[0] == '\0')
-                    {
-                        lineIndex = 0;
-                        continue;
-                    }
-
-                    char commandCopy[BUFSIZE];
-                    strcpy(commandCopy, commandLine);
-
-                    char **segments;
-                    int numOfSegments = findSegments(commandCopy, &segments);
-
-                    if(numOfSegments <= 0)
-                    {
-                        free(segments);
-
-                        lineIndex = 0;
-                        continue;
-                    }
-
-                    if(numOfSegments > 1)
-                    {
-                        commandPacket *packets = malloc(sizeof(commandPacket) * numOfSegments);
-
-                        for(int s = 0; s < numOfSegments; s++) packets[s] = buildPacket(segments[s]);
-
-                        int status = handlePipeline(packets, numOfSegments);
-
-                        for (int s = 0; s < numOfSegments; s++)
-                        {
-                            freePacket(&packets[s]);
-                            free(segments[s]);
-                        }
-
-                        free(packets);
-                        free(segments);
-                    } else {
-                        runCommand(commandLine);
-
-                        free(segments[0]);
-                        free(segments);
-                    }
+                    runCommand(commandLine);
 
                     lineIndex = 0;
                 }
-            }
-            else
-            {
-                if (lineIndex >= capacity - 1)
+            } else {
+                if(lineIndex >= capacity - 1)
                 {
                     capacity *= 2;
 
                     char *temp = realloc(commandLine, capacity);
-                    if (!temp)
+                    if(!temp)
                     {
                         fprintf(stderr, "Error: Memory reallocation failed.\n");
                         free(commandLine);
-
                         return EXIT_FAILURE;
                     }
                     commandLine = temp;
@@ -789,12 +779,10 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (lineIndex > 0)
-    { // is this actually being used? if so, might need to deal with pipelines differently here too!
+    if(lineIndex > 0)
+    {
         commandLine[lineIndex] = '\0';
-        stripComments(commandLine);
-
-        if (commandLine[0] != '\0') runCommand(commandLine);
+        runCommand(commandLine);
     }
 
     if (interactive)
