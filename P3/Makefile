@@ -1,5 +1,5 @@
 CC=gcc # compiler
-CFLAGS= -std=c99 -Wall -fsanitize=address,undefined -I. -Isrc # compiler options
+CFLAGS= -std=c99 -D_POSIX_C_SOURCE=200809L -Wall -fsanitize=address,undefined -I. -Isrc # compiler options
 
 BUILD_FOLDER = builds
 
@@ -26,9 +26,9 @@ runTest: all
 	@echo "\nRunning $(TEST) ... \n"
 	@./$(BUILD_FOLDER)/$(TEST)
 
-# # run all tests
-# runAllTests: all
-# 	@./$(BUILD_FOLDER)/runTests
+# run all tests
+runAllTests: all
+	@./$(BUILD_FOLDER)/runTests
 
 # remove mysh.o and all built test outputs
 clean:

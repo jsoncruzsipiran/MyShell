@@ -1,0 +1,2 @@
+echo comment
+# should not be printed

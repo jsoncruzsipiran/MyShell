@@ -1,0 +1,3 @@
+echo run die
+die
+echo should not be printed

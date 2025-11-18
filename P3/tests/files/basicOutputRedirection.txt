@@ -1,0 +1,1 @@
+echo test > tests/files/file.txt

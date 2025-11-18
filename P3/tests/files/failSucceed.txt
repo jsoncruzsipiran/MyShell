@@ -1,0 +1,1 @@
+cat badfile | echo hello | cat

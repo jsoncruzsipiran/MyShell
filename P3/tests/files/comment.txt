@@ -1,0 +1,2 @@
+echo not a comment
+# should not be printed

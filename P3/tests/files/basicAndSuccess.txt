@@ -1,0 +1,2 @@
+echo hello
+and echo previous succeeded
