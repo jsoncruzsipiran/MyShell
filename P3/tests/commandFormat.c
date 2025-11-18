@@ -121,6 +121,7 @@ int multiPipeline(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -168,6 +169,7 @@ printf("_________________________________________________\n\n");
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -215,6 +217,7 @@ printf("_________________________________________________\n\n");
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -262,6 +265,7 @@ int failSucceed(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -309,6 +313,7 @@ int pipelineFails(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -359,6 +364,7 @@ int basicAndSuccess(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -407,6 +413,7 @@ int basicAndFailure(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -455,6 +462,7 @@ int basicOrSuccess(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -503,6 +511,7 @@ int basicOrFailure(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -551,6 +560,7 @@ int chainConditionalsOne(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -599,6 +609,7 @@ int chainConditionalsTwo(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -647,6 +658,7 @@ int conditionalPipelinesOne(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -695,6 +707,7 @@ int conditionalPipelinesTwo(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -743,6 +756,7 @@ int dieMiddle(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -791,6 +805,7 @@ int noFirst(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -839,6 +854,7 @@ int basicOutputRedirection(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+    
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -888,6 +904,7 @@ int basicInputRedirection(){
 
     int initStatus = initializeShell(2, argv);
     (void)initStatus; 
+
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -935,7 +952,8 @@ int errorRedirection(){
     printFile("tests/files/errorRedirection.txt");
 
     int initStatus = initializeShell(2, argv);
-    (void)initStatus; 
+    (void)initStatus;
+     
     pid_t pid = fork();
     if (pid < 0)
     {

@@ -51,6 +51,7 @@ int runInBatchViaFile()
     int intStatus = initializeShell(argc, argv);
     (void) intStatus;
     int status = runShell();
+    (void) status;
 
     printf("\nInteractive: %d\n\n", interactive);
 
@@ -75,6 +76,7 @@ int endExit()
     printFile("tests/files/runExit.txt");
 
     int initStatus = initializeShell(2, argv);
+    (void) initStatus;
 
     pid_t pid = fork();
     if (pid < 0)
@@ -123,6 +125,7 @@ int endDie()
     printFile("tests/files/runDie.txt");
 
     int initStatus = initializeShell(2, argv);
+    (void) initStatus;
 
     pid_t pid = fork();
     if (pid < 0)
@@ -171,6 +174,7 @@ int endBatchMode()
     printFile("tests/files/endBatchmode.txt");
 
     int initStatus = initializeShell(2, argv);
+    (void) initStatus;
 
     pid_t pid = fork();
     if (pid < 0)
