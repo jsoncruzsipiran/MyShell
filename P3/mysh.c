@@ -16,10 +16,11 @@ static int interactive;
 static int lastStatus = -1;
 static char *commandBuffer = NULL;
 
+/* data structure to hold command line information (the entire line, its input/output if redirection is present) */
 typedef struct {
-    char** commandArgument;
-    char* inputFile;
-    char* outputFile;
+    char** commandArgument; // string of the command line
+    char* inputFile; // STDIN
+    char* outputFile; // STDOUT
 } commandPacket; 
 
 /* welcome message for interactive mode */
@@ -47,9 +48,13 @@ int runBatchFile(char *batchFile)
     return 0;
 }
 
+/* when mysh is reading commands from a non-terminal standard input, any child processes it launches will redirect standard input to /dev/null */
 void applyDevNullIfBatchNoInput() {
+
+    /* redirect standard input to /dev/null for non-terminal standard input */
     if (!interactive) {
         int devnull = open("/dev/null", O_RDONLY);
+
         if (devnull >= 0) {
             dup2(devnull, STDIN_FILENO);
             close(devnull);
@@ -207,18 +212,21 @@ int runDie(const int argc, char **argv)
     exit(EXIT_FAILURE);
 }
 
+/* functino to strip comments from the given line */
 void stripComments(char *line)
 {
-    char *p = strchr(line, '#');
-    if (p) *p = '\0';
+    char *p = strchr(line, '#'); // address of the start of a comment
+    if (p) *p = '\0'; // terminate string at this location
 }
 
+/* function to remove whitespace from the string */
 char *trimWhitespace(char *s)
 {
-    while (isspace((unsigned char)*s)) s++;
+    while (isspace((unsigned char)*s)) s++; // removes preceeding whitespace
 
-    if (*s == '\0') return s;
+    if (*s == '\0') return s; // returns empty string
 
+    /* removes trailing whitespace */
     char *end = s + strlen(s) - 1;
     while (end > s && isspace((unsigned char)*end)) end--;
 
@@ -226,170 +234,195 @@ char *trimWhitespace(char *s)
     return s;
 }
 
+/* function to parse each segement into array of tokens */
 char **tokenize(char *line, int *count)
 {
+    /* features to be implemented */
     int capacity = 10;
     char **tokens = malloc(sizeof(char *) * capacity);
     *count = 0;
 
-    char *token = strtok(line, " \t\n");
+    char *token = strtok(line, " \t\n"); // parse the line for the first token 
 
+    /* loop while there is still a token available */
     while(token)
     {
+        /* resize if we are at capacity */
         if (*count >= capacity - 1)
         {
             capacity *= 2;
             tokens = realloc(tokens, sizeof(char*) * capacity);
         }
 
+        /* store individual token in tokens array, increment count */
         tokens[*count] = token;
         (*count)++;
 
-        token = strtok(NULL, " \t\n");
+        token = strtok(NULL, " \t\n"); // search for next token 
     }
 
-    tokens[*count] = NULL;
-    return tokens;
+    tokens[*count] = NULL; // terminate the token array
+    return tokens; // return the tokens from parsed command line
 }
 
+/* function to create packet (data structure that holds the information from the commandline) */
 commandPacket buildPacket(char **tokens, int count)
 {
-    commandPacket p;
-    p.inputFile = NULL;
-    p.outputFile = NULL;
+    /* features of the packet */
+    commandPacket packet; // node
+    packet.inputFile = NULL; // input file
+    packet.outputFile = NULL; // output file
 
-    p.commandArgument = malloc(sizeof(char*) * (count + 1));
-    int argc = 0;
+    packet.commandArgument = malloc(sizeof(char*) * (count + 1)); // string for commandline
+    int argc = 0; // argument count
 
+    /* iterate throughout the stored tokens to deteect redirection tokens */
     for (int i = 0; i < count; i++)
     {
-        if (strcmp(tokens[i], "<") == 0)
+        if (strcmp(tokens[i], "<") == 0) // input 
         {
-            if (i + 1 < count)
-                p.inputFile = strdup(tokens[++i]);
+            if (i + 1 < count) packet.inputFile = strdup(tokens[++i]); // copies next token as input file 
         }
-        else if (strcmp(tokens[i], ">") == 0)
+        else if (strcmp(tokens[i], ">") == 0) // output 
         {
-            if (i + 1 < count)
-                p.outputFile = strdup(tokens[++i]);
+            if (i + 1 < count) packet.outputFile = strdup(tokens[++i]); // copies next token as output file
         }
         else
         {
-            p.commandArgument[argc++] = strdup(tokens[i]);
+            packet.commandArgument[argc++] = strdup(tokens[i]); // adds token to array of commands
         }
     }
 
-    p.commandArgument[argc] = NULL;
-    return p;
+    packet.commandArgument[argc] = NULL; // terminating array
+    return packet; // returns the packetacket
 }
 
-void freePacket(commandPacket *p)
+/* function to free packet of allocated memory */
+void freePacket(commandPacket *packet)
 {
-    if (!p) return;
+    if (!packet) return; // base case
 
-    if (p->commandArgument)
+    /* if a packet has memory allocated to the commandArgument feature, free its contents */
+    if (packet->commandArgument)
     {
-        for (int i = 0; p->commandArgument[i] != NULL; i++)
-        {
-            free(p->commandArgument[i]);
-        }
-        free(p->commandArgument);
-        p->commandArgument = NULL;
+        /* iterate through all its stored strings */
+        for (int i = 0; packet->commandArgument[i] != NULL; i++) free(packet->commandArgument[i]);
+
+        /* free commandArgument memory */
+        free(packet->commandArgument);
+        packet->commandArgument = NULL;
     }
 
-    if (p->inputFile)
+    /* free allocated memory for inputFile string */
+    if (packet->inputFile)
     {
-        free(p->inputFile);
-        p->inputFile = NULL;
+        free(packet->inputFile);
+        packet->inputFile = NULL;
     }
 
-    if (p->outputFile)
+    /* free allocated memory for outputFile string */
+    if (packet->outputFile)
     {
-        free(p->outputFile);
-        p->outputFile = NULL;
+        free(packet->outputFile);
+        packet->outputFile = NULL;
     }
 }
 
+/* function to execute 1 command inside a CHILD PROCESS */
 void runSingleCommandInChild(char *cmd)
 {
+    /* copy of cmd to tokenize without modifying original string */
     char temp[BUFSIZE];
     strcpy(temp, cmd);
 
+    /* tokenization */
     int tokenCount = 0;
     char **tokens = tokenize(temp, &tokenCount);
-    commandPacket packet = buildPacket(tokens, tokenCount);
 
-    free(tokens);
+    /* create packet from tokens */
+    commandPacket packet = buildPacket(tokens, tokenCount); 
 
-    if (packet.inputFile == NULL && !interactive) {
-        applyDevNullIfBatchNoInput();
-    }
+    free(tokens); // finished process, must free 
 
+    if (!isatty(STDIN_FILENO) && packet.inputFile == NULL) applyDevNullIfBatchNoInput(); // child processes will redirect standard input to /dev/null 
 
+    /* retreive command to execute */
     char *command = packet.commandArgument[0];
-    int argc = 0;
+
+    int argc = 0; // num of arguments
     while(packet.commandArgument[argc]) argc++;
 
     /* apply redirection */
-    if (packet.inputFile)
+    if (packet.inputFile) // input redirection 
     {
         int fd = open(packet.inputFile, O_RDONLY);
-        if (fd < 0) exit(1);
+        if (fd < 0) exit(EXIT_FAILURE);
 
         dup2(fd, STDIN_FILENO);
         close(fd);
     }
 
-    if (packet.outputFile)
+    if (packet.outputFile) // output redirection 
     {
         int fd = open(packet.outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
-        if (fd < 0) exit(1);
+        if (fd < 0) exit(EXIT_FAILURE);
+
         dup2(fd, STDOUT_FILENO);
         close(fd);
     }
 
-    /* built-ins in child */
-    if (strcmp(command, "cd") == 0) exit(runCD(argc, packet.commandArgument));
-    if (strcmp(command, "pwd") == 0) exit(runPWD(argc));
-    if (strcmp(command, "which") == 0)
+    /* built-in commands within child */
+    if (strcmp(command, "cd") == 0) exit(runCD(argc, packet.commandArgument)); // cd command
+
+    if (strcmp(command, "pwd") == 0) exit(runPWD(argc)); // pwd command
+
+    if (strcmp(command, "which") == 0) // which command
     {
-        if (argc != 2) exit(1);
+        if (argc != 2) exit(EXIT_FAILURE); // must be 2 arguments 
+
         exit(runWhich(packet.commandArgument[1]));
     }
-    if (strcmp(command, "exit") == 0) exit(0);
-    if (strcmp(command, "die") == 0) exit(1);
 
-    /* external command */
-    char *dirs[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL};
-    if (access(command, X_OK) == 0)
-        execv(command, packet.commandArgument);
+    if (strcmp(command, "exit") == 0) exit(EXIT_SUCCESS); // exits safely
 
-    char path[BUFSIZE];
-    for (int i = 0; dirs[i]; i++)
+    if (strcmp(command, "die") == 0) exit(EXIT_FAILURE); // abortion
+
+    /* external commands within child */
+    char *directories[] = {"/usr/local/bin", "/usr/bin", "/bin", NULL}; // the only directories we will be searching
+
+    if (access(command, X_OK) == 0) execv(command, packet.commandArgument); // try to execute command, as is
+
+    char path[BUFSIZE]; // string to newly built path
+    for (int i = 0; directories[i]; i++)
     {
-        snprintf(path, sizeof(path), "%s/%s", dirs[i], command);
-        if (access(path, X_OK) == 0)
-            execv(path, packet.commandArgument);
+        snprintf(path, sizeof(path), "%s/%s", directories[i], command); // concat each possible directory to command
+
+        if (access(path, X_OK) == 0) execv(path, packet.commandArgument); // if the command is valid, execute
     }
 
-    exit(1);
+    /* at this point, the command cannot be executed, we have FAILED */
+    exit(EXIT_FAILURE);
 }
 
+/* function to split pipeline into segments */
 int splitPipeline(char *line, char *segments[])
 {
-    int count = 0;
-    char *saveptr;
-    char *token = strtok_r(line, "|", &saveptr);
+    /* features */
+    int count = 0; // number of segments
+    char *saveptr; // internal state for strtok_r()
+    char *token = strtok_r(line, "|", &saveptr); // splits line to create first token before the pipeline
 
+    /* loop until we have processed all tokens or have reached the maximum amount of pipes */
     while(token && count < MAX_PIPES)
     {
         segments[count++] = trimWhitespace(token);
         token = strtok_r(NULL, "|", &saveptr);
     }
 
-    return count;
+    return count; // return number of pipeline segments found 
 }
 
+/* function that executes a full pipeline */
 int runPipeline(char *line)
 {
     char *segments[MAX_PIPES];
@@ -420,7 +453,7 @@ int runPipeline(char *line)
             if (i > 0)
             {
                 dup2(pipes[i-1][0], STDIN_FILENO);
-            } else if (!interactive) {
+            } else if (!isatty(STDIN_FILENO) ) {
                 applyDevNullIfBatchNoInput();
             }
 
@@ -596,7 +629,7 @@ int runCommand(char *commandLine)
 
                 dup2(fd, STDIN_FILENO);
                 close(fd);
-            } else if (!interactive) {
+            } else if (!isatty(STDIN_FILENO)) {
                 applyDevNullIfBatchNoInput();
             }
  
@@ -649,7 +682,7 @@ int runCommand(char *commandLine)
             if (fd < 0) exit(1);
             dup2(fd, STDIN_FILENO);
             close(fd);
-        } else if (!interactive) {
+        } else if (!isatty(STDIN_FILENO)) {
             applyDevNullIfBatchNoInput();
         }
 
