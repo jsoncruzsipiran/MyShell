@@ -5,35 +5,33 @@ name: Fiona Yzabelle Gumaroy
 netID: fag46
 
 ## Program Design:
-## Pipelines
-When dealing with pipelines, we have an array data structure, char *parsedPipes[][], such that parsedPipes[i] is one command. 
 
-For ex: if commandLine = "echo hello | cat"
+## Makefile Instructions:
+To use the Makefile:
 
-parsedPipes[0][0] = echo, parsedPipes[0][1] = hello
-parsedPipes[1][0] = cat
-
-We then use this array to differentiate between the different commands, and to implement the piping logic.
-
+    run "make" to build all the test outputs and mysh.o
+    run "make runTest TEST=someTest" where user replaces sometest with either {"builtInCommands", "commandFormat", "other", "overview"}
+    run "make runAllTests" to build and run all the tests
+    run "make clean" via terminal to clean all outputs inside builds folder
+        
 ## Test Programs:
+
 ### 1 Overview 
 1a. Requirement: Program correctly detects whether to run in interactive mode or batch mode.
 1b. Detection method: When successful, isAtty() will return 1 and will trigger program to run in interactive mode; else, it will run in batch mode and proceed from there.
 1c. Tests: 
     i. runInInteractive(): Write a program where argv = {"./mysh"}. After isAtty() returns 1, program will run interactive mode, print out a welcome message and the interactive int to determine whether it is in interactive or batch mode (1: interactive; 0: batch).
-    
-    ii. runInBatchViaStdIn(): Write a program where argv = {"./mysh"}. TBD
-    
-    ii. runInBatchViaFile(): Write a program where argv = {"./mysh", "tests/inputs/someFile.txt"}. The command in input file is "echo hello batch". After running shell, there is print "hello batch" and will print out the interactive int as mentioned in the first test.
+        
+    ii. runInBatchViaFile(): Write a program where argv = {"./mysh", "tests/files/someFile.txt"}. The command in input file is "echo hello batch". After running shell, there is print "hello batch" and will print out the interactive int as mentioned in the first test.
 
 2a. Requirement: Program terminates when it receives the exit or die commands, or when its input stream ends.
 2b. Detection method: When successful, mysh terminates.
 2c. Tests:
-    i. endExit(): Write a program where argv = {"./mysh", "tests/inputs/runExit.txt}. The commands in input file include: "echo run exit", "exit", and "echo should not be printed". Mysh will print out "run exit" and then terminates. Program succceeds if last print is not printed.
+    i. endExit(): Write a program where argv = {"./mysh", "tests/files/runExit.txt}. The commands in input file include: "echo run exit", "exit", and "echo should not be printed". Mysh will print out "run exit" and then terminates. Program succceeds if last print is not printed.
 
-    ii. endDie(): Write a program where argv = {"./mysh", "tests/inputs/runDie.txt}. The commands in input file include: "echo run die", "die", and "echo should not be printed". Mysh will print out "run die" and then terminates. Program succceeds if last print is not printed.
+    ii. endDie(): Write a program where argv = {"./mysh", "tests/files/runDie.txt}. The commands in input file include: "echo run die", "die", and "echo should not be printed". Mysh will print out "run die" and then terminates. Program succceeds if last print is not printed.
 
-    iii. endBatchMode(): Write a program where argv = {"./mysh", "tests/inputs/endBatchMode.txt"}. The commands in input file include: "echo first command", "echo second command", and "echo last command". Mysh will terminate after executing the last command on file.
+    iii. endBatchMode(): Write a program where argv = {"./mysh", "tests/files/endBatchMode.txt"}. The commands in input file include: "echo first command", "echo second command", and "echo last command". Mysh will terminate after executing the last command on file.
 
 
 ### 2 Command Format
@@ -182,29 +180,26 @@ Therefore, testing commands in both modes would be redundant - if commands work 
     iv. diePipelines(): Write a program where command = "echo hello | die exiting". Program should stop reading commands and prints out "exiting. It will additionally print out the exit status to show it terminating with failure.
 
 ### Other
-1a. Requirement: Mysh correctly detects that a command succeeds or fails.
-1b. Detection method: 
-    a. A command that launches a program succeeds iff. program exits with exit code 0.
-
-2a. Requirement: A command when there is a syntax error.
-2b. Detection method: There will be an error message that is printed out.
-2c. Test:
+1a. Requirement: A command will fail when there is a syntax error.
+1b. Detection method: There will be an error message that is printed out.
+1c. Test:
     i. syntaxError(): Write a program where command = "< <". This command will print out an error, but will proceed to next command if it exists.
 
-3a. Requirement: Mysh exits with EXIT_FAILURE after executing the command die or if it is unable to open its argument (batch file).
-3b. Detection method: Test program will print out an exit status to clarify EXIT_FAILURE status. 
-3c. Tests:
-    i. exitDie(): Write a program where command = "die die". The test program will print out exit status: EXIT_FAILURE.
-    ii. unableToOpenBatchFile(): Write a program where command = "./mysh someBadFile.txt". Mysh will print an error statement, and the test program will print out exit status: EXIT_FAILURE.
+2a. Requirement: Mysh exits with EXIT_FAILURE after if it is unable to open its argument (batch file).
+2b. Detection method: Test program will print out an exit status to clarify EXIT_FAILURE status. 
+2c. Tests:
+    i. unableToOpenBatchFile(): Write a program where command = "./mysh someBadFile.txt". Mysh will print an error statement, and the test program will print out exit status: EXIT_FAILURE.
+
+3a. Requirement: Mysh processes empty batch files correctly.
+3b. Detection method: Stdout will be printed and nothing will be printed.
+3c. Test:
+    i. emptyBatch(): Write a program where command = "./mysh emptYbatch.txt". Mysh will print nothing.
 
 Tingz to Think About:
 1. caps/vs uncapitalized commands [have not checked that yet]
-    a. in real terminal, PWD === pwd (idk if we want to implement both because getcwd does not let PWD through), CD != cd (only cd works, which matches our implementation)
 2. when doing "./mysh /" seems like it leads to infinite loop
 3. when doing "./mysh |" it prints out "pipe>" like how we do interactive mode? idk if that was intentional or just a bug
 5. how should we treat "and echo hello" with no previous command?
-6. add a test to see multi commands where something fails and then someethng succeeds and what the exit code should be; and vice versa!
-8. empty batch
 9. a lot of commands to run!
 10. BUGS:
     ii "which nonexistent" fails -> tets says it should exit in code 0, but it should exit in code 1?
@@ -212,11 +207,7 @@ Tingz to Think About:
 
 11. bugs after pushing:
     i. seems like echo and pipelines dont work: "echo hello | cat" prints hello | cat
-    ii. print out file.txt from redirection
-    iii. test 21: change printing
     iv. exit codes for things failing
-    v. "echo hello | exit" -> doessn't print world, but it doesn't print hello either
-    vi. for die tests, add \n before "Exit Code"
 
 Tests that are failing but should succeed:
 
