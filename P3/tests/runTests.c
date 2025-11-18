@@ -6,17 +6,18 @@
 #include <sys/wait.h>
 
 int main(){
-    int totalTests = 42;
+    int totalTests = 45;
     int passedTests = 0;
     int failedTests = 0;
 
     char *testExecutables[] = {
         "./builds/overview", //5
         "./builds/commandFormat", //20
-        "./builds/builtInCommands" // 17
+        "./builds/builtInCommands", // 17
+        "./builds/other" //3
     };
 
-    int numTests[] = {5, 20, 17};
+    int numTests[] = {5, 20, 17, 3};
 
     int numSuites = sizeof(testExecutables) / sizeof(testExecutables[0]);
     

@@ -18,7 +18,7 @@ int comment()
     printf("_________________________________________________\n\n");
     printf("Test One: Testing if comments are ignored correctly.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/comment.txt"};
+    char *argv[] = {"./mysh", "tests/files/comment.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/comment.txt");
@@ -66,7 +66,7 @@ int basicPipeline(){
 printf("_________________________________________________\n\n");
     printf("Test Two: Testing if one command can be piped to another.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/basicPipeline.txt"};
+    char *argv[] = {"./mysh", "tests/files/basicPipeline.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/basicPipeline.txt");
@@ -114,7 +114,7 @@ int multiPipeline(){
     printf("_________________________________________________\n\n");
     printf("Test Three: Testing if multiple commands can be piped together.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/multiPipeline.txt"};
+    char *argv[] = {"./mysh", "tests/files/multiPipeline.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/multiPipeline.txt");
@@ -161,7 +161,7 @@ int builtInPipeline(){
 printf("_________________________________________________\n\n");
     printf("Test Four: Testing how program handles built-in commands that can be piped together.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/builtInPipeline.txt"};
+    char *argv[] = {"./mysh", "tests/files/builtInPipeline.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/builtInPipeline.txt");
@@ -208,7 +208,7 @@ int failureInMiddle(){
 printf("_________________________________________________\n\n");
     printf("Test Five: Testing pipeline logic if there is a failure in the middle of the process.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/failureInMiddle.txt"};
+    char *argv[] = {"./mysh", "tests/files/failureInMiddle.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/failureInMiddle.txt");
@@ -255,7 +255,7 @@ int failSucceed(){
     printf("_________________________________________________\n\n");
     printf("Test Six: Testing program logic when a failed command is succeeded by successful commands.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/failSucceed.txt"};
+    char *argv[] = {"./mysh", "tests/files/failSucceed.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/failSucceed.txt");
@@ -302,7 +302,7 @@ int pipelineFails(){
     printf("_________________________________________________\n\n");
     printf("Test Seven: Testing pipeline logic where last command fails, which should cause the entire pipeline to fail.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/pipelineFails.txt"};
+    char *argv[] = {"./mysh", "tests/files/pipelineFails.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/pipelineFails.txt");
@@ -352,7 +352,7 @@ int basicAndSuccess(){
     printf("_________________________________________________\n\n");
     printf("Test Eight: Testing program logic if given a conditional using 'AND'.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/basicAndSuccess.txt"};
+    char *argv[] = {"./mysh", "tests/files/basicAndSuccess.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/basicAndSuccess.txt");
@@ -400,7 +400,7 @@ int basicAndFailure(){
     printf("_________________________________________________\n\n");
     printf("Test Nine: Testing program logic if given a conditional using 'AND'.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/basicAndFailure.txt"};
+    char *argv[] = {"./mysh", "tests/files/basicAndFailure.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/basicAndFailure.txt");
@@ -448,7 +448,7 @@ int basicOrSuccess(){
     printf("_________________________________________________\n\n");
     printf("Test Ten: Testing program logic if given a conditional using 'OR'.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/basicOrSuccess.txt"};
+    char *argv[] = {"./mysh", "tests/files/basicOrSuccess.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/basicOrSuccess.txt");
@@ -496,7 +496,7 @@ int basicOrFailure(){
     printf("_________________________________________________\n\n");
     printf("Test Eleven: Testing program logic if given a conditional using 'OR'.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/basicOrFailure.txt"};
+    char *argv[] = {"./mysh", "tests/files/basicOrFailure.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/basicOrFailure.txt");
@@ -544,7 +544,7 @@ int chainConditionalsOne(){
     printf("_________________________________________________\n\n");
     printf("Test Twelve: Testing program logic if given multiple conditionals using 'AND'.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/chainConditionalsOne.txt"};
+    char *argv[] = {"./mysh", "tests/files/chainConditionalsOne.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/chainConditionalsOne.txt");
@@ -592,7 +592,7 @@ int chainConditionalsTwo(){
     printf("_________________________________________________\n\n");
     printf("Test Thirteen: Testing program logic if given multiple conditionals where 'AND' fails.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/chainConditionalsTwo.txt"};
+    char *argv[] = {"./mysh", "tests/files/chainConditionalsTwo.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/chainConditionalsTwo.txt");
@@ -640,7 +640,7 @@ int conditionalPipelinesOne(){
     printf("_________________________________________________\n\n");
     printf("Test Fourteen: Testing program logic if using conditionals and a failing pipeline.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/conditionalPipelinesOne.txt"};
+    char *argv[] = {"./mysh", "tests/files/conditionalPipelinesOne.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/conditionalPipelinesOne.txt");
@@ -688,7 +688,7 @@ int conditionalPipelinesTwo(){
     printf("_________________________________________________\n\n");
     printf("Test Fifteen: Testing program logic if using conditionals and a succeeding pipeline.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/conditionalPipelinesTwo.txt"};
+    char *argv[] = {"./mysh", "tests/files/conditionalPipelinesTwo.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/conditionalPipelinesTwo.txt");
@@ -736,7 +736,7 @@ int dieMiddle(){
     printf("_________________________________________________\n\n");
     printf("Test Sixteen: Testing program logic if using conditionals and a 'die' command in between.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/dieMiddle.txt"};
+    char *argv[] = {"./mysh", "tests/files/dieMiddle.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/dieMiddle.txt");
@@ -784,7 +784,7 @@ int noFirst(){
     printf("_________________________________________________\n\n");
     printf("Test Seventeen: Testing program logic if there is no first command.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/noFirst.txt"};
+    char *argv[] = {"./mysh", "tests/files/noFirst.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/noFirst.txt");
@@ -832,7 +832,7 @@ int basicOutputRedirection(){
     printf("_________________________________________________\n\n");
     printf("Test Eighteen: Testing program logic with basic output redirection.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/basicOutputRedirection.txt"};
+    char *argv[] = {"./mysh", "tests/files/basicOutputRedirection.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/basicOutputRedirection.txt");
@@ -848,8 +848,9 @@ int basicOutputRedirection(){
 
     if (pid == 0)
     {
-        printf("\nStdout Result: \n");
         int childStatus = runShell();
+        printf("\nContents in file.txt: \n");
+        printFile("tests/files/file.txt");
         _exit(childStatus ? EXIT_FAILURE : EXIT_SUCCESS);
     }
     else
@@ -880,7 +881,7 @@ int basicInputRedirection(){
     printf("_________________________________________________\n\n");
     printf("Test Nineteen: Testing program logic with basic input redirection.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/basicInputRedirection.txt"};
+    char *argv[] = {"./mysh", "tests/files/basicInputRedirection.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/basicInputRedirection.txt");
@@ -928,7 +929,7 @@ int errorRedirection(){
     printf("_________________________________________________\n\n");
     printf("Test Twenty One: Testing program logic with redirection error handling.\n\n");
 
-    char *argv[] = {"mysh", "tests/files/errorRedirection.txt"};
+    char *argv[] = {"./mysh", "tests/files/errorRedirection.txt"};
 
     printf("Batch File Input: \n");
     printFile("tests/files/errorRedirection.txt");

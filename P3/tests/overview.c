@@ -36,12 +36,6 @@ int runInInteractive()
     return 0;
 }
 
-int runInBatchViaStdIn()
-{
-    // implement later
-    return 0;
-}
-
 int runInBatchViaFile()
 {
     printf("_________________________________________________\n\n");
@@ -222,7 +216,6 @@ int main(int argc, char *argv[])
     printf("\t If interactive is 1, it is in interactive mode\n");
 
     failures += runInInteractive();
-    // failures += runInBatchViaStdIn();
     failures += runInBatchViaFile();
     failures += endExit();
     failures += endDie();
