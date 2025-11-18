@@ -200,19 +200,3 @@ Tingz to Think About:
 2. when doing "./mysh /" seems like it leads to infinite loop
 3. when doing "./mysh |" it prints out "pipe>" like how we do interactive mode? idk if that was intentional or just a bug
 5. how should we treat "and echo hello" with no previous command?
-9. a lot of commands to run!
-10. BUGS:
-    ii "which nonexistent" fails -> tets says it should exit in code 0, but it should exit in code 1?
-    iii. "cd badfile" gives code 0, but should give 1?
-
-11. bugs after pushing:
-    i. seems like echo and pipelines dont work: "echo hello | cat" prints hello | cat
-    iv. exit codes for things failing
-
-Tests that are failing but should succeed:
-
-Tests that are succeeding but should fail:
-
-Bugged Tests:
-builtInCommands.c:
-- test twelve

@@ -1,5 +1,5 @@
 CC=gcc # compiler
-CFLAGS= -std=c99 -Wall -fsanitize=address,undefined -I. -Isrc # compiler options
+CFLAGS= -std=c99 -D_POSIX_C_SOURCE=200809L -Wall -fsanitize=address,undefined -I. -Isrc # compiler options
 
 BUILD_FOLDER = builds
 
