@@ -334,7 +334,7 @@ void freePacket(commandPacket *packet)
 }
 
 /* function to execute 1 command inside a CHILD PROCESS */
-void runSingleCommandInChild(char *cmd)
+void runSingleCommandInChild(char *cmd, int inPipeline)
 {
     /* copy of cmd to tokenize without modifying original string */
     char temp[BUFSIZE];
@@ -348,8 +348,9 @@ void runSingleCommandInChild(char *cmd)
     commandPacket packet = buildPacket(tokens, tokenCount); 
 
     free(tokens); // finished process, must free 
-
-    if (!isatty(STDIN_FILENO) && packet.inputFile == NULL) applyDevNullIfBatchNoInput(); // child processes will redirect standard input to /dev/null 
+ 
+    if (
+        !inPipeline && !isatty(STDIN_FILENO) && packet.inputFile == NULL) applyDevNullIfBatchNoInput(); // child processes will redirect standard input to /dev/null 
 
     /* retreive command to execute */
     char *command = packet.commandArgument[0];
@@ -361,7 +362,10 @@ void runSingleCommandInChild(char *cmd)
     if (packet.inputFile) // input redirection 
     {
         int fd = open(packet.inputFile, O_RDONLY);
-        if (fd < 0) exit(EXIT_FAILURE);
+        if (fd < 0){
+            fprintf(stderr, "no such file or directory: %s\n", packet.inputFile);
+            exit(EXIT_FAILURE);
+        } 
 
         dup2(fd, STDIN_FILENO);
         close(fd);
@@ -370,7 +374,9 @@ void runSingleCommandInChild(char *cmd)
     if (packet.outputFile) // output redirection 
     {
         int fd = open(packet.outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
-        if (fd < 0) exit(EXIT_FAILURE);
+        if (fd < 0){
+            exit(EXIT_FAILURE);
+        } 
 
         dup2(fd, STDOUT_FILENO);
         close(fd);
@@ -477,8 +483,7 @@ int runPipeline(char *line)
                 close(pipes[j][1]);
             }
 
-            /* Execute the command segment */
-            runSingleCommandInChild(segments[i]); 
+            runSingleCommandInChild(segments[i], 1);
         }
     }
 
@@ -663,7 +668,10 @@ int runCommand(char *commandLine)
             if(packet.inputFile != NULL)
             {
                 int fd = open(packet.inputFile, O_RDONLY);
-                if(fd < 0) exit(EXIT_FAILURE);
+                if(fd < 0){
+                    fprintf(stderr, "no such file or directory: %s\n", packet.inputFile);
+                    exit(EXIT_FAILURE);
+                }
 
                 dup2(fd, STDIN_FILENO);
                 close(fd);
@@ -674,7 +682,9 @@ int runCommand(char *commandLine)
             if(packet.outputFile != NULL)
             {
                 int fd = open(packet.outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
-                if(fd < 0) exit(EXIT_FAILURE);
+                if(fd < 0){ 
+                    exit(EXIT_FAILURE); 
+                }
 
                 dup2(fd, STDOUT_FILENO);
                 close(fd);
@@ -718,8 +728,10 @@ int runCommand(char *commandLine)
         if (packet.inputFile != NULL) 
         {
             int fd = open(packet.inputFile, O_RDONLY);
-            if (fd < 0) exit(EXIT_FAILURE);
-
+            if (fd < 0){
+                fprintf(stderr, "no such file or directory: %s\n", packet.inputFile);
+                exit(1);
+            }
             dup2(fd, STDIN_FILENO);
             close(fd);
         } else if (!isatty(STDIN_FILENO)) {
