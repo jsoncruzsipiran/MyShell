@@ -168,10 +168,10 @@ int endBatchMode()
     printf("_________________________________________________\n\n");
     printf("Test Five: Testing if program ends when batch file input ends.\n");
 
-    char *argv[] = {"mysh", "tests/files/endBatchmode.txt"};
+    char *argv[] = {"mysh", "tests/files/endBatchMode.txt"};
 
     printf("\nBatch File Input: \n");
-    printFile("tests/files/endBatchmode.txt");
+    printFile("tests/files/endBatchMode.txt");
 
     int initStatus = initializeShell(2, argv);
     (void) initStatus;

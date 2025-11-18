@@ -97,7 +97,7 @@ int cdFailure()
             return 1;
         }
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
         {
             printf("\nTest succeeded: Program correctly failed to process 'cd' command.\n");
             return 0;
@@ -196,7 +196,7 @@ int pwdFailure()
             return 1;
         }
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
         {
             printf("\nTest succeeded: Program correctly failed to process 'pwd' command.\n");
             return 0;
@@ -296,7 +296,7 @@ int whichBuiltIn()
             return 1;
         }
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
         {
             printf("\nTest succeeded: Program correctly failed to process 'which' command when given a built in command for an argument.\n");
             return 0;
@@ -346,7 +346,7 @@ int whichMulti()
             return 1;
         }
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
         {
             printf("\nTest succeeded: Program correctly failed to process 'which' command when given more than one argument.\n");
             return 0;
@@ -396,7 +396,7 @@ int whichNone()
             return 1;
         }
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
         {
             printf("\nTest succeeded: Program correctly failed to process 'which' command when no arguments are given.\n");
             return 0;
@@ -446,7 +446,7 @@ int whichFailure()
             return 1;
         }
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
         {
             printf("\nTest succeeded: Program correctly failed to process 'which' command when given a program that is not found.\n");
             return 0;

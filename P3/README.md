@@ -95,19 +95,21 @@ Therefore, testing commands in both modes would be redundant - if commands work 
         and echo step 2". 
 
     vi. chainConditionalsTwo(): Write a program, where conditional commands = 
-        "echo hello
-        and cat badfile
+        "cat badfile
+        and echo hello
         or echo runs because cat failed". 
         This test specifically tests out that if the "and" command fails, the next "or" command should execute.
 
     vi. conditionalPipelinesOne(): Write a program, where conditional commands = 
         "echo hello | cat badfile
-        and echo pipeline failed". 
+        and echo pipeline failed
+        or echo print this". 
         This test specifically tests out program logic when the first command contains a failing pipeline.
 
     vi. conditionalPipelinesTwo(): Write a program, where conditional commands = 
             "echo hello | cat 
-            and echo pipeline succeeded". 
+            and echo pipeline succeeded
+            or echo should not print". 
             This test specifically tests out program logic when the first command contains a pipeline that succeeds.
 
     viii. dieMiddle(): Write a program, where conditional commands = 
@@ -160,7 +162,7 @@ Therefore, testing commands in both modes would be redundant - if commands work 
     echo should not print" 
     Program should still exit as it ignores the extra arguments.
     iii. exitPipelines(): Write a program in batch mode where commands = 
-        "echo hello | exit
+        "echo hello | cat | exit
         echo world".
         Test program will print out "hello" and not "world" as it exited prior to the "echo world" command.
     iv. exitConditionals(): Write a program in batch mode where commands = 

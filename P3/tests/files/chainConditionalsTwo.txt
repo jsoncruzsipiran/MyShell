@@ -1,3 +1,3 @@
-echo hello
-and cat badfile
+cat badfile
+and echo hello
 or echo runs because cat failed

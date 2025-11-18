@@ -1,2 +1,3 @@
 echo hello | cat badfile
 and echo pipeline failed
+or echo print this

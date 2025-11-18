@@ -1,2 +1,3 @@
 echo hello | cat
 and echo pipeline succeeded
+or echo should not print

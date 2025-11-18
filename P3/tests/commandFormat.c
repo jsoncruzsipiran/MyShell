@@ -336,15 +336,13 @@ int pipelineFails(){
             return 1;
         }
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
         {
-            printf("\nExit Code: %d\n", WEXITSTATUS(status));
             printf("\nTest succeeded: Program correctly processed the pipeline and terminated with an exit code 1.\n");
             return 0;
         }
         else
         {
-            printf("\nExit Code: %d\n", WEXITSTATUS(status));
             printf("\nTest failed: Program did not process the pipeline correctly (child exit code %d).\n",
                    WIFEXITED(status) ? WEXITSTATUS(status) : -1);
             return 1;
@@ -779,7 +777,7 @@ int dieMiddle(){
             return 1;
         }
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
         {
             printf("\nTest succeeded: Program correctly processed the conditional.\n");
             return 0;

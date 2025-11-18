@@ -1,1 +1,4 @@
+echo hello | ls
 echo hello | cat
+echo pwd | ./mysh
+cat tests/files/comment.txt | ./mysh

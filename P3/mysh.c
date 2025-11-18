@@ -349,8 +349,7 @@ void runSingleCommandInChild(char *cmd, int inPipeline)
 
     free(tokens); // finished process, must free 
  
-    if (
-        !inPipeline && !isatty(STDIN_FILENO) && packet.inputFile == NULL) applyDevNullIfBatchNoInput(); // child processes will redirect standard input to /dev/null 
+    if (!inPipeline && !isatty(STDIN_FILENO) && packet.inputFile == NULL) applyDevNullIfBatchNoInput(); // child processes will redirect standard input to /dev/null 
 
     /* retreive command to execute */
     char *command = packet.commandArgument[0];
