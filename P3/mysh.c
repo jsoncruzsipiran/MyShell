@@ -498,7 +498,6 @@ int runPipeline(char *line)
 
     /* pipeline result = last command's status */
     int status = 0;
-    int containsDie = (strstr(line, "die") != NULL);
 
     for (int i = 0; i < n; i++) {
         int s;
