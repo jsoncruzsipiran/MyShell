@@ -71,18 +71,46 @@ int unableToOpenBatchFile()
     printf("_________________________________________________\n\n");
     printf("Test Two: Testing if program handles unable to open batch file correctly.\n\n");
 
-    char *argv[] = {"./mysh", "tests/files/nonExistentFile.txt"};
-    int argc = sizeof(argv) / sizeof(argv[0]);
+    char *argv[] = {"./mysh", "tests/files/nonExistentFile.txt"};    
 
-    int status = initializeShell(argc, argv);
-
-    if (status != EXIT_FAILURE)
+    pid_t pid = fork();
+    if (pid < 0)
     {
-        printf("\nTest failed: Program did not return EXIT_FAILURE when batch file could not be opened.\n");
+        perror("fork");
         return 1;
     }
 
-    printf("\nTest succeeded: Program correctly returned EXIT_FAILURE when batch file could not be opened.\n");
+    if (pid == 0)
+    {
+        printf("\nStdout Result: \n");
+        int initStatus = initializeShell(2, argv);
+        (void) initStatus;
+        int childStatus = runShell();
+        _exit(childStatus ? EXIT_FAILURE : EXIT_SUCCESS);
+    }
+    else
+    {
+        int status;
+        if (waitpid(pid, &status, 0) < 0)
+        {
+            perror("waitpid");
+            return 1;
+        }
+
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 1)
+        {
+            printf("\nExit Code: %d\n", WEXITSTATUS(status));
+            printf("\nTest succeeded: Program correctly processed not being able to open a batch file and terminated with exit code 1.\n");
+            return 0;
+        }
+        else
+        {
+            printf("\nExit Code: %d\n", WEXITSTATUS(status));
+            printf("\nTest failed: Program incorrectly processed error or terminated with an exit code that is not 1 (child exit code %d).\n",
+                   WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+            return 1;
+        }
+    }
     return 0;
 }
 

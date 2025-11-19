@@ -338,7 +338,7 @@ int pipelineFails(){
 
         if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
         {
-            printf("\nTest succeeded: Program correctly processed the pipeline and terminated with an exit code 1.\n");
+            printf("\nTest succeeded: Program correctly processed the pipeline.\n");
             return 0;
         }
         else

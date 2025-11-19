@@ -180,7 +180,10 @@ Therefore, testing commands in both modes would be redundant - if commands work 
         "cat badfile
         or die exiting". 
         Program should stop reading commands and prints out "exiting". It will additionally print out the exit status to show it terminating with failure.
-    iv. diePipelines(): Write a program where command = "echo hello | die exiting". Program should stop reading commands and prints out "exiting. It will additionally print out the exit status to show it terminating with failure.
+    iv. diePipelines(): Write a program where command = 
+        "echo hello | die exiting
+        echo should not print". 
+        Program should stop reading commands and prints out "exiting. It will additionally print out the exit status to show it terminating with failure.
 
 ### Other
 1a. Requirement: A command will fail when there is a syntax error.

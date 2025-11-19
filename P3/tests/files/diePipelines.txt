@@ -1,1 +1,2 @@
 echo hello | cat | die now
+echo should not print

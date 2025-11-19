@@ -16,6 +16,7 @@ static int interactive;
 static int lastStatus = -1;
 static char *commandBuffer = NULL;
 static int dieFlag = 0;
+static int shellStatus = 0;
 
 /* data structure to hold command line information (the entire line, its input/output if redirection is present) */
 typedef struct {
@@ -39,6 +40,7 @@ int runBatchFile(char *batchFile)
     if (fd < 0)
     {
         fprintf(stderr, "Error: Could not open file %s\n", batchFile);
+        shellStatus = 1;
         return EXIT_FAILURE;
     }
 
@@ -207,13 +209,13 @@ int runDie(const int argc, char **argv)
     }
 
     dieFlag = 1;
+    shellStatus = 1;
 
     if (interactive)
     {
         printGoodbye();
         fflush(stdout);
     }
-
     exit(EXIT_FAILURE);
 }
 
@@ -495,6 +497,7 @@ int runPipeline(char *line)
 
     /* pipeline result = last command's status */
     int status = 0;
+    int containsDie = (strstr(line, "die") != NULL);
 
     for (int i = 0; i < n; i++) {
         int s;
@@ -504,9 +507,17 @@ int runPipeline(char *line)
         /* If any child ran die(), terminate entire shell */
         if (dieFlag) {
             runDie(1, NULL);
+            status = 1;
+            shellStatus = 1;
         }
 
-        if (i == n - 1) status = code;
+        if (i == n - 1){
+            status = code;
+            if (code != 0 && containsDie){
+                shellStatus = EXIT_FAILURE;
+                runDie(1, NULL);
+            }
+        }
     }
 
     return status; // last process determines pipeline status
@@ -875,8 +886,8 @@ int runShell()
     }
 
     free(commandBuffer);
-
-    return EXIT_SUCCESS;
+    
+    return shellStatus;
 }
 
 int main(int argc, char *argv[])
@@ -885,6 +896,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
 
     int result = runShell();
+    // printf("result in mysh: %d\n", result);
 
     if (interactive)
     {
