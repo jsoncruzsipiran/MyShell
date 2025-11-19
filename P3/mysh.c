@@ -17,6 +17,7 @@ static int lastStatus = -1;
 static char *commandBuffer = NULL;
 static int dieFlag = 0;
 static int shellStatus = 0;
+static int dieExecuted = 0; 
 
 /* data structure to hold command line information (the entire line, its input/output if redirection is present) */
 typedef struct {
@@ -513,9 +514,11 @@ int runPipeline(char *line)
 
         if (i == n - 1){
             status = code;
-            if (code != 0 && containsDie){
+            char *lastSegment = segments[n-1];
+            if (strstr(lastSegment, "die") && code != 0) {
+                dieExecuted = 1;  // Set flag in parent process
                 shellStatus = EXIT_FAILURE;
-                runDie(1, NULL);
+                exit(EXIT_FAILURE);  // Exit immediately without goodbye
             }
         }
     }
